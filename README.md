@@ -4,11 +4,11 @@ ShadowProxy opens public pages through a Vercel Function. Each request gets a ra
 
 ## Run
 
-Use the deployed Vercel app at `/RUNTHIS!.html`. Opening the downloaded HTML from `file://` shows the interface but **server routing requires the deployment**. Do not enter passwords or other private information.
+Use the [hosted app](https://shadowproxy-fireax14.vercel.app/RUNTHIS!.html). Opening the downloaded HTML from `file://` shows the interface but **server routing requires the deployment**. Do not enter passwords or other private information.
 
 ## Deploy to Vercel
 
-Connect this GitHub repository to a Vercel project. Set `ROUTE_SECRET` to a unique random value of at least 32 characters in Production and Preview. Deploy. The Vercel server needs outbound network access to public HTTP(S) sites. The static GitHub Pages guide is not a routing server.
+The [current deployment](https://shadowproxy-fireax14.vercel.app/RUNTHIS!.html) was uploaded directly to Vercel. GitHub auto-deploy is **not connected** because the team's GitHub integration is unavailable. To deploy a fork, connect its repository to Vercel or upload the source, set `ROUTE_SECRET` to a unique random value of at least 32 characters in Production and Preview, then deploy. The static GitHub Pages guide is not a routing server.
 
 ## Checks
 
