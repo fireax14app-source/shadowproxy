@@ -5,7 +5,22 @@ const https = require('node:https');
 const net = require('node:net');
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const MAX_AGE = 24 * 60 * 60 * 1000;
+const MAX_AGE = 30 * 60 * 1000;
+const buckets = new Map();
+const blocked = new net.BlockList();
+
+[
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8],
+  ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24],
+  ['192.88.99.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24],
+  ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4]
+].forEach(([ip, prefix]) => blocked.addSubnet(ip, prefix, 'ipv4'));
+
+[
+  ['::', 128], ['::1', 128], ['64:ff9b::', 96], ['100::', 64], ['2001::', 32],
+  ['2001:2::', 48], ['2001:10::', 28], ['2001:20::', 28], ['2001:db8::', 32],
+  ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]
+].forEach(([ip, prefix]) => blocked.addSubnet(ip, prefix, 'ipv6'));
 
 function key() {
   const secret = process.env.ROUTE_SECRET;
@@ -13,23 +28,19 @@ function key() {
   return crypto.createHash('sha256').update(secret).digest();
 }
 
-function publicAddress(address) {
-  const ip = address.replace(/^\[|\]$/g, '').toLowerCase();
-  if (ip.includes(':')) {
-    if (ip === '::1' || ip === '::' || ip.startsWith('fc') || ip.startsWith('fd') || /^fe[89ab]/.test(ip)) return false;
-    if (ip.startsWith('::ffff:')) return publicAddress(ip.slice(7));
-    return !ip.startsWith('2001:db8:');
-  }
-  const n = ip.split('.').map(Number);
-  if (n.length !== 4 || n.some(x => !Number.isInteger(x) || x < 0 || x > 255)) return false;
-  const a = n[0], b = n[1], c = n[2];
-  return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127 || a === 192 && b === 0 && c === 0 || a === 192 && b === 0 && c === 2 || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
+function publicAddress(value) {
+  let address = String(value || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (address.startsWith('::ffff:')) return publicAddress(address.slice(7));
+  const family = net.isIP(address);
+  if (!family) return false;
+  return !blocked.check(address, family === 4 ? 'ipv4' : 'ipv6');
 }
 
 function parseTarget(value) {
-  const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port && !['80', '443'].includes(url.port) || !url.hostname || url.href.length > 4096) throw new Error('Only public HTTP(S) addresses are allowed');
-  if ((net.isIP(url.hostname.replace(/^\[|\]$/g, '')) || url.hostname.includes(':')) && !publicAddress(url.hostname)) throw new Error('Private addresses are blocked');
+  const url = new URL(String(value || ''));
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || (url.port && !['80', '443'].includes(url.port)) || !host || url.href.length > 4096) throw new Error('Only public HTTP(S) addresses are allowed');
+  if ((net.isIP(host) || host.includes(':')) && !publicAddress(host)) throw new Error('Private addresses are blocked');
   return url;
 }
 
@@ -43,6 +54,7 @@ function encode(url) {
 function decode(token) {
   if (!/^[A-Za-z0-9_-]{35,6000}$/.test(token)) throw new Error('Invalid route');
   const b = Buffer.from(token, 'base64url');
+  if (b.length < 30) throw new Error('Invalid route');
   const decipher = crypto.createDecipheriv('aes-256-gcm', key(), b.subarray(0, 12));
   decipher.setAuthTag(b.subarray(12, 28));
   const data = JSON.parse(Buffer.concat([decipher.update(b.subarray(28)), decipher.final()]).toString());
@@ -50,11 +62,47 @@ function decode(token) {
   return parseTarget(data.u);
 }
 
+function clientIp(req) {
+  const raw = String(req.headers && (req.headers['x-real-ip'] || req.headers['x-forwarded-for']) || 'unknown');
+  return raw.split(',').at(-1).trim().slice(0, 80);
+}
+
+function limited(req, limit) {
+  const now = Date.now();
+  const id = clientIp(req) + ':' + (req.method === 'POST' ? 'create' : 'fetch');
+  const entry = buckets.get(id);
+  if (!entry || now - entry.started >= 60000) buckets.set(id, { started: now, count: 1 });
+  else if (++entry.count > limit) return true;
+  if (buckets.size > 2000) for (const [name, item] of buckets) if (now - item.started >= 60000) buckets.delete(name);
+  return false;
+}
+
+function sameOrigin(req) {
+  const origin = String(req.headers && req.headers.origin || '');
+  const host = String(req.headers && req.headers.host || '');
+  if (!origin || !host) return false;
+  try {
+    const site = req.headers['sec-fetch-site'];
+    return new URL(origin).host === host && (!site || site === 'same-origin');
+  } catch { return false; }
+}
+
+function securityHeaders(res) {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), browsing-topics=()');
+}
+
+async function resolvePublic(hostname) {
+  const records = await dns.lookup(hostname, { all: true, verbatim: true });
+  if (!records.length || records.some(record => !publicAddress(record.address))) throw new Error('Private or unresolved address blocked');
+  return records[Math.floor(Math.random() * records.length)];
+}
+
 async function fetchPublic(target, redirects = 0) {
   const url = parseTarget(target);
-  const records = await dns.lookup(url.hostname, { all: true, verbatim: true });
-  if (!records.length || records.some(record => !publicAddress(record.address))) throw new Error('Private or unresolved address blocked');
-  const chosen = records[0];
+  const chosen = await resolvePublic(url.hostname);
   const agent = url.protocol === 'https:' ? https : http;
   return new Promise((resolve, reject) => {
     const req = agent.get(url, {
@@ -70,7 +118,7 @@ async function fetchPublic(target, redirects = 0) {
         return resolve(fetchPublic(next, redirects + 1));
       }
       const type = String(response.headers['content-type'] || 'application/octet-stream').split(';')[0].toLowerCase();
-      if (!/^(text\/html|application\/xhtml\+xml|text\/plain|text\/css|image\/(png|jpeg|gif|webp)|font\/(woff|woff2)|application\/font-woff)$/.test(type)) {
+      if (!/^(text\/html|application\/xhtml\+xml|text\/plain|text\/css|image\/(png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon)|font\/(woff|woff2)|application\/font-woff)$/.test(type)) {
         response.destroy(); return reject(new Error('Unsupported content type'));
       }
       if (Number(response.headers['content-length']) > MAX_BYTES) { response.destroy(); return reject(new Error('Response too large')); }
@@ -109,33 +157,34 @@ function rewriteCss(body, base) {
 }
 
 async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  securityHeaders(res);
   try {
     if (req.method === 'POST') {
-      const origin = req.headers && req.headers.origin;
-      if (origin && new URL(origin).host !== req.headers.host) return res.status(403).send('Cross-origin requests are blocked');
-      const target = parseTarget(req.body && req.body.url);
-      const records = await dns.lookup(target.hostname, { all: true });
-      if (!records.length || records.some(record => !publicAddress(record.address))) throw new Error('Private or unresolved address blocked');
+      if (!sameOrigin(req)) return res.status(403).send('Same-origin requests only');
+      if (limited(req, 60)) return res.status(429).send('Rate limit exceeded');
+      if (!/^application\/json(?:;|$)/i.test(String(req.headers['content-type'] || ''))) return res.status(415).send('JSON required');
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const target = parseTarget(body && body.url);
+      await resolvePublic(target.hostname);
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).json({ path: '/r/' + encode(target.href) });
     }
-    if (req.method !== 'GET') return res.status(405).send('Method not allowed');
+    if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).send('Method not allowed');
+    if (limited(req, 300)) return res.status(429).send('Rate limit exceeded');
     const token = String(req.query && req.query.token || '');
     const target = decode(token);
     const upstream = await fetchPublic(target);
     if (upstream.type === 'text/html' || upstream.type === 'application/xhtml+xml') {
       res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.status(upstream.status).send(rewriteHtml(upstream.body, upstream.url));
+      return res.status(upstream.status).send(req.method === 'HEAD' ? '' : rewriteHtml(upstream.body, upstream.url));
     }
     if (upstream.type === 'text/css') {
       res.setHeader('Content-Type', 'text/css; charset=utf-8');
-      return res.status(upstream.status).send(rewriteCss(upstream.body, upstream.url));
+      return res.status(upstream.status).send(req.method === 'HEAD' ? '' : rewriteCss(upstream.body, upstream.url));
     }
     res.setHeader('Content-Type', upstream.type);
-    return res.status(upstream.status).send(upstream.body);
+    return res.status(upstream.status).send(req.method === 'HEAD' ? '' : upstream.body);
   } catch (error) {
     const unsafe = /Private|Only public|Invalid route|Expired route|Unsupported content type/.test(error.message);
     return res.status(unsafe ? 400 : 502).send(unsafe ? error.message : 'Server routing failed');
@@ -143,4 +192,4 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
-module.exports._test = { encode, decode, parseTarget, publicAddress, rewriteHtml, rewriteCss, fetchPublic };
+module.exports._test = { encode, decode, parseTarget, publicAddress, rewriteHtml, rewriteCss, fetchPublic, sameOrigin, limited };

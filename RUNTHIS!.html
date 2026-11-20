@@ -7,17 +7,6 @@
 <meta name="description" content="ShadowProxy routes public pages through its Vercel server using opaque addresses." />
 <title>ShadowProxy - by Fireax14</title>
 <link id="favicon" rel="icon" type="image/png" href="assets/shadowproxy-icon.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<script>
-  try {
-    var savedTheme = localStorage.getItem('sp.theme');
-    if (savedTheme && /^(midnight|aurora|ember|ice|paper|terminal)$/.test(savedTheme)) {
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-  } catch (e) {}
-</script>
 <link rel="stylesheet" href="shadowproxy.css" />
 </head>
 <body>
@@ -101,7 +90,7 @@
         <div data-reveal>
           <p class="eyebrow">02 / Routing</p>
           <h2>How it loads</h2>
-          <p class="sec-sub">Server mode loads public pages and supported assets through Vercel. Direct mode and cloaked windows connect to the site.</p>
+          <p class="sec-sub">Server mode loads public pages and supported assets through Vercel. Cloak opens its configured destination separately.</p>
         </div>
       </div>
       <div class="cards3">
@@ -143,22 +132,22 @@
       </div>
       <div class="cards4">
         <div class="tool" data-reveal>
-          <img class="tool-image" src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <img class="tool-image" src="assets/themes/paper.webp" alt="" loading="lazy" decoding="async" />
           <h3>Tab disguise</h3>
           <p>Choose a destination in Settings. Cloak opens that website in a new tab, so you can leave the current view quickly.</p>
         </div>
         <div class="tool" data-reveal style="--i:1">
-          <img class="tool-image" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <img class="tool-image" src="assets/themes/tool-work.webp" alt="" loading="lazy" decoding="async" />
           <h3>Panic key</h3>
           <p>Use the keyboard shortcut to switch away quickly. The current page may need to reload when you return.</p>
         </div>
         <div class="tool" data-reveal style="--i:2">
-          <img class="tool-image" src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
-          <h3>Cloaked window</h3>
-          <p>Open the current page directly in an <code>about:blank</code> popup. This bypasses the server route, and some sites refuse framing.</p>
+          <img class="tool-image" src="assets/themes/tool-code.webp" alt="" loading="lazy" decoding="async" />
+          <h3>Isolated viewer</h3>
+          <p>Pages stay in the isolated server viewer. Direct destination frames are disabled.</p>
         </div>
         <div class="tool" data-reveal style="--i:3">
-          <img class="tool-image" src="https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <img class="tool-image" src="assets/themes/tool-notes.webp" alt="" loading="lazy" decoding="async" />
           <h3>Known limits</h3>
           <p>Server mode is for public documents. Script-heavy sites, logins, and forms are not supported.</p>
         </div>
@@ -228,9 +217,6 @@
     <button class="stage-new" id="stageNew" type="button" title="New tab">+</button>
     <div class="stage-acts">
       <span class="relay-chip" id="relayChip">server idle</span>
-      <button class="icon-btn" id="stealthBtn" type="button" title="Open direct in cloaked window" aria-label="Open direct in cloaked window">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
-      </button>
       <button class="icon-btn" id="stageClose" type="button" title="Close viewer">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -245,8 +231,6 @@
       <select id="stageMode">
         <option value="proxy">Proxy</option>
 
-        <option value="direct">Direct</option>
-        <option value="tab">New tab</option>
       </select>
     </div>
     <button class="stage-go" id="stageGo" type="button">Open page</button>

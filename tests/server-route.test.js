@@ -30,7 +30,8 @@ test('private destinations and credentials are refused', () => {
   for (const target of ['http://127.0.0.1/', 'http://10.0.0.1/', 'http://192.168.1.1/', 'http://[::1]/', 'http://user:pass@example.com/', 'file:///etc/passwd']) {
     assert.throws(() => route.parseTarget(target), target);
   }
-  for (const address of ['127.0.0.1', '169.254.169.254', '192.168.1.1', '10.2.3.4', '::1', 'fc00::1']) assert.equal(route.publicAddress(address), false);
+  for (const address of ['127.0.0.1', '169.254.169.254', '192.168.1.1', '10.2.3.4', '224.0.0.1', '::1', '64:ff9b::1', '2001:db8::1', '2002::1', 'fc00::1', 'fe80::1', 'ff02::1']) assert.equal(route.publicAddress(address), false);
+  for (const address of ['1.1.1.1', '2606:4700:4700::1111']) assert.equal(route.publicAddress(address), true);
 });
 
 test('HTML routes ordinary resources and removes scripts and handlers', () => {
@@ -42,7 +43,7 @@ test('HTML routes ordinary resources and removes scripts and handlers', () => {
 
 test('POST creates a path and GET fetches through the server', { skip: process.env.LIVE_ROUTE_TEST !== '1' }, async () => {
   const first = response();
-  await handler({ method: 'POST', headers: { host: 'localhost' }, body: { url: 'https://example.com/' } }, first);
+  await handler({ method: 'POST', headers: { host: 'localhost', origin: 'https://localhost', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }, body: { url: 'https://example.com/' } }, first);
   assert.equal(first.statusCode, 200);
   assert.match(first.body.path, /^\/r\/[A-Za-z0-9_-]+$/);
   const second = response();
@@ -54,6 +55,15 @@ test('POST creates a path and GET fetches through the server', { skip: process.e
 
 test('cross-origin creation is blocked', async () => {
   const res = response();
-  await handler({ method: 'POST', headers: { host: 'shadowproxy.example', origin: 'https://other.example' }, body: { url: 'https://example.com/' } }, res);
+  await handler({ method: 'POST', headers: { host: 'shadowproxy.example', origin: 'https://other.example', 'content-type': 'application/json' }, body: { url: 'https://example.com/' } }, res);
   assert.equal(res.statusCode, 403);
+});
+
+test('missing Origin and non-JSON route creation are blocked', async () => {
+  const missing = response();
+  await handler({ method: 'POST', headers: { host: 'shadowproxy.example', 'content-type': 'application/json' }, body: { url: 'https://example.com/' } }, missing);
+  assert.equal(missing.statusCode, 403);
+  const wrongType = response();
+  await handler({ method: 'POST', headers: { host: 'shadowproxy.example', origin: 'https://shadowproxy.example', 'content-type': 'text/plain' }, body: { url: 'https://example.com/' } }, wrongType);
+  assert.equal(wrongType.statusCode, 415);
 });

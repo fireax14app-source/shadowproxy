@@ -6,10 +6,13 @@
   var root = document.documentElement;
   var historyLimit = 30;
 
+  try {
+    var savedTheme = localStorage.getItem('sp.theme');
+    if (savedTheme && /^(midnight|aurora|ember|ice|paper|terminal)$/.test(savedTheme)) root.setAttribute('data-theme', savedTheme);
+  } catch (e) {}
+
   var REAL_TITLE = 'ShadowProxy - by Fireax14';
-  var FAKE_TITLE = 'Classes';
   var ICON_REAL = 'assets/shadowproxy-icon.png';
-  var ICON_FAKE = 'https://icons.duckduckgo.com/ip3/classroom.google.com.ico';
 
   var DATA = window.ShadowProxyData || {};
   var THEMES = DATA.THEMES || [];
@@ -79,10 +82,34 @@
 
   var ICONS = !/[?&]icons=off(?:&|$)/i.test(location.search);
   var iconObserver = null;
+  var iconPaths = {};
+
+  async function routePath(url, signal) {
+    var response = await fetch('/api/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url }),
+      signal: signal
+    });
+    if (!response.ok) throw new Error((await response.text()).slice(0, 200) || 'Server refused the address');
+    var result = await response.json();
+    if (!result.path || !/^\/r\/[A-Za-z0-9_-]+$/.test(result.path)) throw new Error('Invalid server route');
+    return result.path;
+  }
+
+  function loadIcon(img) {
+    var src = img.getAttribute('data-src');
+    if (!src) return;
+    if (iconPaths[src]) { img.src = iconPaths[src]; return; }
+    routePath(src).then(function (path) {
+      iconPaths[src] = path;
+      if (img.isConnected) img.src = path;
+    }).catch(function () { img.onerror(); });
+  }
 
   function observeIcon(img) {
     if (typeof IntersectionObserver !== 'function') {
-      img.src = img.getAttribute('data-src');
+      loadIcon(img);
       return;
     }
     if (!iconObserver) {
@@ -91,8 +118,7 @@
           if (!en.isIntersecting) return;
           var el = en.target;
           iconObserver.unobserve(el);
-          var src = el.getAttribute('data-src');
-          if (src) el.src = src;
+          loadIcon(el);
         });
       }, { rootMargin: '120px' });
     }
@@ -367,8 +393,7 @@
     var t = tabById(id);
     if (t) {
       stageAddr.value = t.url || '';
-      if (t.status === 'direct') setRelayChip('direct · bypasses server');
-      else if (t.status === 'failed') setRelayChip('server failed', 'bad');
+      if (t.status === 'failed') setRelayChip('server failed', 'bad');
       else if (t.status === 'stopped') setRelayChip('stopped');
       else if (t.status === 'routing') setRelayChip('routing…');
       else setRelayChip(t.via ? 'via ' + t.via : 'server idle', t.via ? 'ok' : '');
@@ -395,8 +420,6 @@
         '<button type="button" data-act="cancel">Stop</button>' +
         '<button type="button" data-act="reload">Reload page</button>' +
 
-        '<button type="button" data-act="direct">Direct</button>' +
-        '<button type="button" data-act="open">Open</button>' +
       '</div>' +
       '<div class="loader"></div>' +
       '<iframe class="frame" referrerpolicy="no-referrer" title="ShadowProxy view"></iframe>' +
@@ -404,8 +427,6 @@
       '<div class="errbox"><div class="errcard"><h3>We could not open this page here</h3><p class="errmsg"></p>' +
         '<div class="row">' +
           '<button class="btn accent" type="button" data-act="retry">Retry server route</button>' +
-          '<button class="btn" type="button" data-act="direct">Load direct</button>' +
-          '<button class="btn" type="button" data-act="open">Open outside</button>' +
         '</div></div></div>';
 
     stageBody.appendChild(pane);
@@ -427,12 +448,10 @@
       else if (act === 'reload') load(t, t.url, t.mode, true);
       else if (act === 'retry') load(t, t.url, 'proxy');
 
-      else if (act === 'direct') load(t, t.url, 'direct');
       else if (act === 'cancel') {
         if (t.ctrl) t.ctrl.abort();
         toast('Stopped');
       }
-      else if (act === 'open') window.open(t.url, '_blank', 'noopener,noreferrer');
     });
 
     return pane;
@@ -502,7 +521,7 @@
 
   function recordHistory(t, url, mode) {
     if (t._historyNav) { t._historyNav = false; return; }
-    var entry = { url: url, mode: mode === 'direct' ? 'direct' : 'proxy' };
+    var entry = { url: url, mode: 'proxy' };
     var current = t.history[t.historyIndex];
     if (current && current.url === entry.url && current.mode === entry.mode) return;
     if (t.historyIndex < t.history.length - 1) t.history = t.history.slice(0, t.historyIndex + 1);
@@ -512,11 +531,6 @@
   }
 
   function load(t, url, mode, preserveHistory) {
-    if (mode === 'tab') {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      toast('Opened in a browser tab');
-      return;
-    }
     if (!url) return;
     if (!preserveHistory) {
       t._historyNav = false;
@@ -525,7 +539,7 @@
       t._historyNav = false;
     }
     t.url = url;
-    t.mode = mode === 'direct' ? 'direct' : 'proxy';
+    t.mode = 'proxy';
     t.status = 'routing';
     t.title = prettyHost(url);
     t.via = null;
@@ -536,63 +550,13 @@
     stageAddr.value = url;
     updateHistoryButtons(t);
 
-    if (t.mode === 'direct') loadDirect(t, url);
-    else loadProxy(t, url);
+    loadProxy(t, url);
   }
 
   function openTarget(url, mode) {
     mode = mode || stageMode.value || 'proxy';
-    if (mode === 'tab') {
-      window.open(url, '_blank', 'noopener,noreferrer');
-      toast('Opened in a browser tab');
-      return;
-    }
     var t = tabById(activeId) || newTab();
     load(t, url, mode);
-  }
-
-  function loadDirect(t, url) {
-    ensurePane(t);
-    if (t.ctrl) { t.ctrl.abort(); t.ctrl = null; }
-    var my = ++t.req;
-    t.mode = 'direct';
-    t.status = 'routing';
-    t.errEl.classList.remove('on');
-    t.loaderEl.classList.remove('on');
-    t.pane.classList.remove('loading');
-    t.viaEl.textContent = 'direct';
-    t.urlEl.textContent = url;
-    t.frame.removeAttribute('srcdoc');
-    t.frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads');
-    t.frame.onload = function () {
-      if (t.destroyed || t.req !== my) return;
-      clearTimeout(t.directTimer);
-      t.status = 'direct';
-      t.loaderEl.classList.remove('on');
-      t.pane.classList.remove('loading');
-      setTabStatus(t, 'direct · frame attempted');
-    };
-    t.frame.onerror = function () {
-      if (t.destroyed || t.req !== my) return;
-      clearTimeout(t.directTimer);
-      t.status = 'failed';
-      t.errMsg.textContent = 'This site refused to load inside a frame. Use Open outside instead.';
-      t.errEl.classList.add('on');
-      setTabStatus(t, 'direct failed', 'bad');
-    };
-    clearTimeout(t.directTimer);
-    t.directTimer = setTimeout(function () {
-      if (t.destroyed || t.req !== my || t.status === 'loaded') return;
-      t.status = 'failed';
-      t.loaderEl.classList.remove('on');
-      t.pane.classList.remove('loading');
-      t.errMsg.textContent = 'This site refused to load inside a frame or is taking too long. Use Open outside instead.';
-      t.errEl.classList.add('on');
-      setTabStatus(t, 'direct blocked', 'bad');
-    }, 9000);
-    t.frame.src = url;
-    updateHistoryButtons(t);
-    setTabStatus(t, 'direct · loading');
   }
 
   async function loadProxy(t, url) {
@@ -613,19 +577,11 @@
 
     try {
       if (location.protocol === 'file:') throw new Error('Server routing needs the deployed Vercel app. Open the online version instead.');
-      var response = await fetch('/api/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url }),
-        signal: ctrl.signal
-      });
-      if (!response.ok) throw new Error((await response.text()).slice(0, 200) || 'Server refused the address');
-      var res = await response.json();
-      if (!res.path || !/^\/r\/[A-Za-z0-9_-]+$/.test(res.path)) throw new Error('Invalid server route');
+      var path = await routePath(url, ctrl.signal);
       if (t.destroyed || t.req !== my) return;
       t.frame.removeAttribute('srcdoc');
-      t.frame.setAttribute('sandbox', 'allow-popups');
-      t.frame.src = res.path;
+      t.frame.setAttribute('sandbox', '');
+      t.frame.src = path;
       updateHistoryButtons(t);
       t.via = 'Vercel';
       t.status = 'loaded';
@@ -680,80 +636,6 @@
     cloakEl.setAttribute('aria-hidden', 'true');
     document.title = REAL_TITLE;
     favicon.href = ICON_REAL;
-    resumeActive();
-  }
-
-  function suspendFrames() {
-    tabs.forEach(function (t) {
-      if (!t.frame) return;
-      var hasDoc = t.frame.hasAttribute('srcdoc') || (t.frame.getAttribute('src') && t.frame.getAttribute('src') !== 'about:blank');
-      if (!hasDoc) return;
-      t.suspended = true;
-      t.frame.removeAttribute('srcdoc');
-      t.frame.removeAttribute('src');
-      t.frame.setAttribute('src', 'about:blank');
-    });
-  }
-
-  function resumeActive() {
-    var t = tabById(activeId);
-    if (!t || !t.suspended) return;
-    t.suspended = false;
-    if (t.url) load(t, t.url, t.mode);
-  }
-
-  function openStealth() {
-    var t = tabById(activeId);
-    var url = t && t.url ? t.url : '';
-    var w = window.open('about:blank', '_blank');
-    if (!w) { toast('Popup blocked - allow popups for this file'); return; }
-    var body =
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Classes</title>' +
-      '<style>html,body{height:100%;margin:0}' +
-      'body{font:14px/1.5 Roboto,"Segoe UI",Arial,sans-serif;background:#f8f9fa;color:#202124}' +
-      '.top{height:64px;display:flex;align-items:center;gap:16px;padding:0 22px;background:#fff;' +
-      'border-bottom:1px solid #e0e0e0;position:sticky;top:0}' +
-      '.grid{display:grid;grid-template-columns:repeat(3,4px);gap:3px}' +
-      '.grid i{width:4px;height:4px;background:#5f6368;border-radius:1px}' +
-      '.brand{font-size:22px;color:#5f6368}' +
-      '.av{margin-left:auto;width:32px;height:32px;border-radius:50%;background:#1a73e8;' +
-      'color:#fff;display:grid;place-items:center;font-size:13px}' +
-      '.wrap{max-width:1100px;margin:0 auto;padding:26px 24px 60px}' +
-      'h1{font-size:28px;font-weight:400;margin:0 0 2px}p{color:#5f6368;font-size:13.5px;margin:0 0 22px}' +
-      '.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}' +
-      '.card{background:#fff;border:1px solid #dadce0;border-radius:10px;overflow:hidden}' +
-      '.head{height:88px;padding:12px 14px;color:#fff;display:flex;flex-direction:column;justify-content:space-between}' +
-      '.head b{font-size:15px;font-weight:500}.head span{font-size:11.5px;opacity:.92}' +
-      '.foot{display:flex;gap:20px;padding:11px 14px;border-top:1px solid #e8eaed;color:#5f6368;font-size:12px}' +
-      '.frame{position:fixed;inset:64px 0 0;width:100%;height:calc(100% - 64px);border:0;display:none;background:#fff}' +
-      'body.show .frame{display:block}body.show .wrap{display:none}' +
-      '</style></head><body>' +
-      '<div class="top"><div class="grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>' +
-      '<div class="brand">Classroom</div><div class="av">C</div></div>' +
-      '<div class="wrap"><h1>Classes</h1><p>Assignments, announcements, and classwork</p><div class="cards">' +
-      card('#1a73e8', 'Algebra II', 'Mr. Delgado · Period 3') +
-      card('#188038', 'AP Biology', 'Ms. Okafor · Period 1') +
-      card('#c5221f', 'World History', 'Mr. Bianchi · Period 5') +
-      card('#8430ce', 'English 11', 'Mrs. Lindqvist · Period 2') +
-      card('#e37400', 'Chemistry', 'Dr. Haddad · Period 6') +
-      card('#0b8043', 'Computer Science', 'Ms. Park · Period 4') +
-      '</div></div>' +
-      '<iframe class="frame" title="content"></iframe>' +
-      '<scr' + 'ipt>(function(){' +
-      'var f=document.querySelector(".frame");' +
-      'if(f&&' + JSON.stringify(url) + '){f.src=' + JSON.stringify(url) + ';document.body.classList.add("show")}' +
-      '})();</scr' + 'ipt>' +
-      '</body></html>';
-
-    function card(color, name, teacher) {
-      return '<div class="card"><div class="head" style="background:' + color + '">' +
-        '<b>' + name + '</b><span>' + teacher + '</span></div>' +
-        '<div class="foot"><span>Assignments</span><span>Stream</span><span>People</span></div></div>';
-    }
-
-    w.document.open();
-    w.document.write(body);
-    w.document.close();
   }
 
   var modalInertState = null;
@@ -897,7 +779,6 @@
       renderTabs();
     });
 
-    $('#stealthBtn').addEventListener('click', openStealth);
 
     stageGo.addEventListener('click', function () {
       var raw = stageAddr.value.trim();
@@ -1046,7 +927,7 @@
     var savedMode = 'proxy';
     try {
       var m = localStorage.getItem('sp.mode');
-      if (m === 'direct' || m === 'tab' || m === 'proxy') savedMode = m;
+      if (m === 'proxy') savedMode = m;
     } catch (e) {}
     stageMode.value = savedMode;
     stageMode.addEventListener('change', function () {

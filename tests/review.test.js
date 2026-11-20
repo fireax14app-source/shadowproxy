@@ -38,8 +38,8 @@ test('bare domains retain query and hash', () => {
   assert.equal(api.normalize('example.com/docs'), 'https://example.com/docs');
 });
 
-test('server mode uses a sandbox without scripts or forms', () => {
-  assert.match(source, /setAttribute\('sandbox', 'allow-popups'\)/);
+test('server mode uses a sandbox without scripts, forms, or popups', () => {
+  assert.match(source, /setAttribute\('sandbox', ''\)/);
   assert.match(source, /fetch\('\/api\/route'/);
   assert.doesNotMatch(source, /proxyFetch|cors\.dev|allorigins/i);
 });

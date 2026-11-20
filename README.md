@@ -1,6 +1,8 @@
 # ShadowProxy
 
-ShadowProxy opens public pages through a Vercel Function. Each request gets a randomized, encrypted `/r/…` address. The server fetches the page; the browser does not call public CORS relays. Supported images and stylesheets are routed through the same server. Scripts and forms in fetched pages are disabled, so sign-ins and complex apps will not work. Direct mode and cloaked windows bypass server routing.
+ShadowProxy opens public pages through a Vercel Function. Each request gets a randomized, encrypted `/r/…` address. The server fetches the page; the browser does not call public CORS relays. Supported images and stylesheets are routed through the same server. Scripts and forms in fetched pages are disabled, so sign-ins and complex apps will not work. The Cloak action opens its configured destination separately. Direct browsing from the viewer is disabled.
+
+This restriction is deliberate: executing arbitrary destination scripts under a shared proxy origin is unsafe. See [SECURITY.md](SECURITY.md) for the enforced boundary and the remote-browser-isolation architecture required for complex authenticated sites.
 
 ## Run
 
