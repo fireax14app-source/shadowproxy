@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark light" />
+<meta name="description" content="ShadowProxy - a single-file, client-side web proxy. Paste a link, read it through a public CORS relay, sandboxed and rewritten. No server, no account." />
+<title>ShadowProxy - by Fireax14</title>
+<link id="favicon" rel="icon" type="image/png" href="assets/shadowproxy-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script>
+  try {
+    var savedTheme = localStorage.getItem('sp.theme');
+    if (savedTheme && /^(midnight|aurora|ember|ice|paper|terminal)$/.test(savedTheme)) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="shadowproxy.css" />
+</head>
+<body>
+<div class="pointer-light" id="pointerLight" aria-hidden="true"></div>
+<div class="boot-loader" id="bootLoader" role="status" aria-live="polite" aria-label="Loading ShadowProxy"><div class="boot-orbit" aria-hidden="true"><span></span><span></span><span></span></div><div class="boot-copy"><b>Shadow<span>Proxy</span></b><small>initializing relay chain</small></div><div class="boot-progress" aria-hidden="true"><i></i></div></div>
+<header class="top" id="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#top" aria-label="ShadowProxy home">
+      <span class="mark">
+        <img src="assets/shadowproxy-icon.png" alt="" width="34" height="34" />
+      </span>
+      <span class="brand-txt">
+        <b>Shadow<i>Proxy</i></b>
+        <small>by Fireax14</small>
+      </span>
+    </a>
+    <nav class="nav">
+      <a href="#launchpad">Launchpad</a>
+      <a href="#routes">Routing</a>
+      <a href="#toolkit">Toolkit</a>
+      <a href="#usage">Usage</a>
+      <a href="#credits">Credits</a>
+    </nav>
+    <div class="top-right">
+      <div class="themes" id="themes" role="group" aria-label="Theme"><label for="themeSelect">Theme</label><select id="themeSelect" aria-label="Theme"></select></div>
+      <span class="clock" id="clock">--:--</span>
+      <button class="btn ghost" id="settingsBtn" type="button">Settings</button>
+      <button class="btn ghost" id="cloakBtn" type="button">Cloak</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="hero">
+    <div class="hero-bg" id="heroBg" aria-hidden="true"></div>
+    <div class="hero-scrim" aria-hidden="true"></div>
+    <div class="wrap hero-in">
+      <p class="kicker" data-reveal>client-side relay · v4 modular</p>
+      <h1 data-reveal style="--i:1">Open a public page.</h1>
+      <p class="lede" data-reveal style="--i:2">
+        Enter an address or search term. Public relays may be unavailable.
+      </p>
+      <form class="search" id="homeForm" data-reveal style="--i:3" autocomplete="off">
+        <svg class="s-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="homeInput" type="text" placeholder="Search the web or paste a link" autocomplete="off" spellcheck="false" aria-label="Search or URL" />
+        <button class="search-btn" type="submit">
+          Open page
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <div class="under" data-reveal style="--i:4">
+        <span><span class="kbd">/</span> to focus</span>
+        <span class="sep"></span>
+        <span>relay chain</span>
+        <span class="sep"></span>
+        <span><b>36</b> launch targets</span>
+        <span class="sep"></span>
+        <span>6 themes</span>
+      </div>
+      <div class="scroll-cue" data-reveal style="--i:5"><span></span>scroll</div>
+    </div>
+  </section>
+
+  <section class="sec" id="launchpad">
+    <div class="wrap">
+      <div class="sec-head">
+        <div data-reveal>
+          <p class="eyebrow">01 / Sites</p>
+          <h2>Sites</h2>
+          <p class="sec-sub">Choose a site or enter your own address above.</p>
+        </div>
+        <div class="filters" id="filters" data-reveal style="--i:1"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
+
+  <section class="sec alt" id="routes">
+    <div class="wrap">
+      <div class="sec-head">
+        <div data-reveal>
+          <p class="eyebrow">02 / Routing</p>
+          <h2>How it loads</h2>
+          <p class="sec-sub">Documents use public relays. Assets may load directly.</p>
+        </div>
+      </div>
+      <div class="cards3">
+        <div class="card" data-reveal>
+          <span class="card-num">01 / FETCH</span>
+          <h3>Fetch</h3>
+          <p>A public relay retrieves the document. Assets may load directly. This does not hide your identity.</p>
+          <span class="tag">cors.dev · allorigins · cors.lol</span>
+        </div>
+        <div class="card" data-reveal style="--i:1">
+          <span class="card-num">02 / REWRITE</span>
+          <h3>Rewrite</h3>
+          <p>Relative URLs point to the original site. Ordinary links route back through this app.</p>
+          <span class="tag">base injection · csp strip</span>
+        </div>
+        <div class="card" data-reveal style="--i:2">
+          <span class="card-num">03 / SERVE</span>
+          <h3>Display</h3>
+          <p>The result opens in a sandboxed frame. Sign-ins and complex apps may not work.</p>
+          <span class="tag">sandboxed srcdoc · per-tab state</span>
+        </div>
+      </div>
+      <div class="chain" data-reveal>
+        <span class="chain-label">relay chain</span>
+        <div class="chain-row" id="chainRow"></div>
+        <span class="chain-note">failover left → right</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="toolkit">
+    <div class="wrap">
+      <div class="sec-head">
+        <div data-reveal>
+          <p class="eyebrow">03 - toolkit</p>
+          <h2>Built for a locked-down machine.</h2>
+          <p class="sec-sub">A few practical controls for a shared or restricted machine.</p>
+        </div>
+      </div>
+      <div class="cards4">
+        <div class="tool" data-reveal>
+          <img class="tool-image" src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <h3>Tab disguise</h3>
+          <p>Choose a destination in Settings. Cloak opens that website in a new tab, so you can leave the current view quickly.</p>
+        </div>
+        <div class="tool" data-reveal style="--i:1">
+          <img class="tool-image" src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <h3>Panic key</h3>
+          <p>Use the keyboard shortcut to switch away quickly. The current page may need to reload when you return.</p>
+        </div>
+        <div class="tool" data-reveal style="--i:2">
+          <img class="tool-image" src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <h3>Cloaked window</h3>
+          <p>Open the current page in an <code>about:blank</code> popup. Some sites may refuse to appear inside its frame.</p>
+        </div>
+        <div class="tool" data-reveal style="--i:3">
+          <img class="tool-image" src="https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
+          <h3>Reader fallback</h3>
+          <p>When a page fights the frame, Reader pulls a text-only copy through the last relay in the chain.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec alt" id="usage">
+    <div class="wrap">
+      <div class="sec-head"><div data-reveal><p class="eyebrow">04 - usage</p><h2>What this tab is using.</h2><p class="sec-sub">A lightweight browser app with live diagnostics, a public relay chain, and no install step.</p></div></div>
+      <div class="usage-grid">
+        <article class="usage-card" data-reveal><span class="usage-kicker">LIVE MEMORY</span><strong id="usageMemory">checking…</strong><p id="usageMemoryNote">Chromium exposes heap metrics; other browsers report availability.</p><button class="btn ghost usage-refresh" id="usageRefresh" type="button">Refresh</button></article>
+        <article class="usage-card" data-reveal style="--i:1"><span class="usage-kicker">APP FOOTPRINT</span><strong id="usageFootprint">local modules</strong><p>HTML, CSS, and JavaScript are loaded from the same folder. No build tool or server is required for the local entrypoint.</p></article>
+        <article class="usage-card" data-reveal style="--i:2"><span class="usage-kicker">ROUTING LIMITS</span><strong>4 paths · 20s</strong><p>Public relays can fail or rate-limit requests. The chain has a 20-second budget; Reader is a text-only fallback.</p></article>
+      </div>
+      <div class="platform-strip" data-reveal><span class="platform-label">SUPPORTED ENVIRONMENTS</span><span class="platform-pill">Linux</span><span class="platform-pill">macOS</span><span class="platform-pill">Windows</span><span class="platform-pill">Chrome</span><span class="platform-note">Modern browser · file:// or local host</span></div>
+    </div>
+  </section>
+  <section class="sec" id="credits">
+    <div class="wrap"><div class="sec-head"><div data-reveal><p class="eyebrow">05 - credits</p><h2>Built with open web standards.</h2><p class="sec-sub">ShadowProxy is assembled by Fireax14. The original project code is MIT licensed; relay services and destination sites remain independent third parties.</p></div></div><div class="cards3"><div class="card" data-reveal><span class="card-num">DESIGN</span><h3>ShadowProxy</h3><p>Interface, themes, keyboard flow, loading screen, and modular handoff.</p><span class="tag">by Fireax14</span></div><div class="card" data-reveal style="--i:1"><span class="card-num">SAFETY</span><h3>Public pages only</h3><p>Do not enter passwords, payment details, private messages, or other secrets into a relayed page.</p><span class="tag">MIT code · third-party services</span></div><div class="card" data-reveal style="--i:2"><span class="card-num">LICENSE</span><h3>MIT License</h3><p>See the repository LICENSE file for the original code grant and warranty disclaimer.</p><span class="tag">open source</span></div></div></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div>
+      <div class="foot-brand">
+        <span class="mark foot-mark"><img src="assets/shadowproxy-icon.png" alt="" width="26" height="26" loading="lazy" /></span>
+        ShadowProxy
+      </div>
+      <p>Client-side modules, no analytics, no account system, and no first-party cookies. Relay traffic is visible to the relay operator - use public pages, not secrets.</p>
+    </div>
+    <div class="foot-right">
+      <div class="foot-col">
+        <b>Build</b>
+        <span>v4 · modular local files</span>
+        <span>36 targets · 6 themes</span>
+        <span>4 relays · 1 search</span>
+      </div>
+      <div class="foot-col">
+        <b>Keys</b>
+        <span>Backtick · cloak</span>
+        <span>Ctrl+Shift+X · panic</span>
+        <span>/ · focus search</span>
+      </div>
+      <div class="foot-col">
+        <b>Credit</b>
+        <span>by Fireax14</span>
+        <span>ShadowProxy</span>
+      </div>
+    </div>
+    <div class="foot-col legal-col">
+      <b>Legal</b>
+      <button class="foot-link" id="termsLink" type="button">Terms of use</button>
+      <a class="foot-link" href="LICENSE" target="_blank" rel="noopener">MIT License</a>
+    </div>
+  </div>
+</footer>
+
+<div class="stage" id="stage" inert aria-hidden="true">
+  <div class="stage-head">
+    <button class="stage-back" id="stageBack" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+      Home
+    </button>
+    <div class="stage-tabs" id="stageTabs" role="tablist" aria-label="Open pages"></div>
+    <button class="stage-new" id="stageNew" type="button" title="New tab">+</button>
+    <div class="stage-acts">
+      <span class="relay-chip" id="relayChip">relay idle</span>
+      <button class="icon-btn" id="stealthBtn" type="button" title="Open in cloaked window">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+      </button>
+      <button class="icon-btn" id="stageClose" type="button" title="Close viewer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="stage-bar">
+    <div class="addr-wrap">
+      <span class="addr-dot"></span>
+      <label class="sr-only" for="stageAddr">Address or search query</label>
+      <input id="stageAddr" type="text" placeholder="Search or paste a link" autocomplete="off" spellcheck="false" />
+      <label class="sr-only" for="stageMode">Load mode</label>
+      <select id="stageMode">
+        <option value="proxy">Proxy</option>
+        <option value="reader">Reader</option>
+        <option value="direct">Direct</option>
+        <option value="tab">New tab</option>
+      </select>
+    </div>
+    <button class="stage-go" id="stageGo" type="button">Open page</button>
+  </div>
+  <div class="stage-body" id="stageBody"></div>
+</div>
+
+<div class="cloak" id="cloak" aria-hidden="true">
+  <div class="gc-top">
+    <div class="gc-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="gc-brand">Classroom</div>
+    <div class="gc-nav"><span>Home</span><span>Calendar</span><span>To-do</span></div>
+    <div class="gc-avatar">C</div>
+  </div>
+  <div class="gc-body">
+    <h2 class="gc-title">Classes</h2>
+    <p class="gc-sub">Assignments, announcements, and classwork</p>
+    <div class="gc-cards">
+      <div class="gc-card">
+        <div class="gc-head" style="background:#1a73e8"><span class="gc-cname">Algebra II</span><span class="gc-cteach">Mr. Delgado · Period 3</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+      <div class="gc-card">
+        <div class="gc-head" style="background:#188038"><span class="gc-cname">AP Biology</span><span class="gc-cteach">Ms. Okafor · Period 1</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+      <div class="gc-card">
+        <div class="gc-head" style="background:#c5221f"><span class="gc-cname">World History</span><span class="gc-cteach">Mr. Bianchi · Period 5</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+      <div class="gc-card">
+        <div class="gc-head" style="background:#8430ce"><span class="gc-cname">English 11</span><span class="gc-cteach">Mrs. Lindqvist · Period 2</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+      <div class="gc-card">
+        <div class="gc-head" style="background:#e37400"><span class="gc-cname">Chemistry</span><span class="gc-cteach">Dr. Haddad · Period 6</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+      <div class="gc-card">
+        <div class="gc-head" style="background:#0b8043"><span class="gc-cname">Computer Science</span><span class="gc-cteach">Ms. Park · Period 4</span></div>
+        <div class="gc-foot"><span>Assignments</span><span>Stream</span><span>People</span></div>
+      </div>
+    </div>
+    <div class="gc-todo">
+      <h3>To-do</h3>
+      <div class="gc-row"><span class="gc-dot" style="background:#1a73e8"></span><span>Problem set 7 - quadratic functions</span><span class="gc-due">Due tomorrow</span></div>
+      <div class="gc-row"><span class="gc-dot" style="background:#188038"></span><span>Lab report - cellular respiration</span><span class="gc-due">Due Friday</span></div>
+      <div class="gc-row"><span class="gc-dot" style="background:#c5221f"></span><span>Reading response - chapter 12</span><span class="gc-due">Due Friday</span></div>
+      <div class="gc-row"><span class="gc-dot" style="background:#8430ce"></span><span>Essay outline - thesis draft</span><span class="gc-due">Due Monday</span></div>
+    </div>
+  </div>
+  <button class="gc-exit" id="cloakExit" type="button" title="Exit">×</button>
+</div>
+
+
+<div class="settings-panel" id="settingsPanel" aria-hidden="true"><div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="settings-head"><div><p class="eyebrow">preferences</p><h2 id="settingsTitle">Settings</h2></div><button class="icon-btn" id="settingsClose" type="button" aria-label="Close settings">×</button></div><label for="cloakUrl">Cloak destination</label><p class="settings-help">When you press Cloak, ShadowProxy opens this website in a new tab.</p><input id="cloakUrl" type="url" inputmode="url" placeholder="https://www.google.com/" autocomplete="off" spellcheck="false" /><div class="settings-actions"><button class="btn accent" id="settingsSave" type="button">Save</button><button class="btn" id="settingsReset" type="button">Reset</button></div></div></div>
+<div class="tos-gate on" id="tosGate" aria-hidden="false"><div class="tos-card" role="dialog" aria-modal="true" aria-labelledby="tosTitle"><p class="eyebrow">before you launch</p><h2 id="tosTitle">Terms of use</h2><p>ShadowProxy is a client-side tool for public web pages. Relay operators may see the URLs and content they handle. Do not enter passwords, payment information, private messages, or other sensitive data.</p><p>Use it only for lawful purposes and respect destination-site terms, copyright, access rules, and applicable policies. The original ShadowProxy code is available under the MIT License; third-party services and content keep their own terms.</p><div class="tos-actions"><button class="btn accent" id="tosAccept" type="button">Accept &amp; continue</button><a href="#credits">Read credits</a></div></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="shadowproxy-data.js"></script>
+<script src="shadowproxy-app.js"></script>
+</body>
+</html>
