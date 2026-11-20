@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/r/:token", "destination": "/api/route?token=:token" }
+  ]
+}

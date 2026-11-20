@@ -15,7 +15,6 @@
   var THEMES = DATA.THEMES || [];
   var CATS = DATA.CATS || [];
   var LINKS = DATA.LINKS || [];
-  var RELAYS = DATA.RELAYS || [];
   var SEARCH = DATA.SEARCH || function (q) { return 'https://www.bing.com/search?q=' + encodeURIComponent(q); };
 
   var favicon = $('#favicon');
@@ -61,23 +60,6 @@
   }
   function prettyHost(url) {
     return hostOf(url).replace(/^www\./, '') || 'page';
-  }
-  function escHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-  function decodeEntities(s) {
-    return String(s)
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#0?39;/g, "'")
-      .replace(/&#x27;/gi, "'")
-      .replace(/&nbsp;/g, ' ');
   }
   function toast(msg) {
     toastEl.textContent = msg;
@@ -261,7 +243,7 @@
   function normalize(v) {
     var raw = String(v || '').trim();
     if (!raw) return null;
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw) && /^[\w-]+(\.[\w-]+)+(:\d+)?(\/[^\s]*)?$/.test(raw)) raw = 'https://' + raw;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw) && /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#][^\s]*)?$/.test(raw)) raw = 'https://' + raw;
     try {
       var parsed = new URL(raw);
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
@@ -281,73 +263,100 @@
     for (var i = 0; i < tabs.length; i++) { if (tabs[i].id === id) return tabs[i]; }
     return null;
   }
-  function tabByFrame(source) {
-    for (var i = 0; i < tabs.length; i++) {
-      if (tabs[i].frame && tabs[i].frame.contentWindow === source) return tabs[i];
-    }
-    return null;
-  }
-  function makeBridgeToken() {
-    if (window.crypto && window.crypto.getRandomValues) {
-      var bytes = new Uint32Array(4);
-      window.crypto.getRandomValues(bytes);
-      return Array.prototype.map.call(bytes, function (n) { return n.toString(16); }).join('-');
-    }
-    return String(Date.now()) + '-' + String(Math.random()).slice(2);
-  }
+  var stageReturnFocus = null;
+  var stageInertState = null;
 
   function showStage() {
+    var opening = !stage.classList.contains('on');
+    if (opening) {
+      stageReturnFocus = document.activeElement;
+      stageInertState = [];
+      Array.prototype.forEach.call(document.body.children, function (el) {
+        if (el === stage || el === settingsPanel || el === tosGate || el.tagName === 'SCRIPT') return;
+        stageInertState.push({ el: el, inert: el.hasAttribute('inert') });
+        el.setAttribute('inert', '');
+      });
+    }
     stage.classList.add('on');
     stage.setAttribute('aria-hidden', 'false');
     stage.removeAttribute('inert');
     root.classList.add('locked');
+    if (opening && stageAddr) stageAddr.focus();
   }
 
   function hideStage() {
     stage.classList.remove('on');
     stage.setAttribute('aria-hidden', 'true');
     stage.setAttribute('inert', '');
-    root.classList.remove('locked');
+    if (stageInertState) {
+      stageInertState.forEach(function (item) {
+        if (!item.inert) item.el.removeAttribute('inert');
+      });
+      stageInertState = null;
+    }
+    if (!activeModal()) root.classList.remove('locked');
+    if (stageReturnFocus && stageReturnFocus.isConnected && !activeModal()) stageReturnFocus.focus();
   }
 
   function renderTabs() {
+    var hadFocus = stageTabsEl.contains(document.activeElement);
     stageTabsEl.innerHTML = '';
     tabs.forEach(function (t) {
       var el = document.createElement('div');
       el.className = 'stab' + (t.id === activeId ? ' on' : '');
 
+      var select = document.createElement('button');
+      select.type = 'button';
+      select.className = 'stab-select';
+      select.id = 'tab-' + t.id;
+      select.setAttribute('role', 'tab');
+      select.setAttribute('aria-selected', t.id === activeId ? 'true' : 'false');
+      select.setAttribute('aria-controls', 'pane-' + t.id);
+      select.tabIndex = t.id === activeId ? 0 : -1;
+
       if (t.url) {
-        el.appendChild(favEl(t.url, 14));
+        select.appendChild(favEl(t.url, 14));
       } else {
         var ph = document.createElement('span');
         ph.className = 'fav';
         ph.textContent = '·';
-        el.appendChild(ph);
+        select.appendChild(ph);
       }
 
       var label = document.createElement('b');
       label.textContent = t.title || 'New tab';
+      select.appendChild(label);
+      select.addEventListener('click', function () { activate(t.id); });
+      select.addEventListener('keydown', function (e) {
+        var index = tabs.indexOf(t);
+        var nextIndex = index;
+        if (e.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') nextIndex = (index + tabs.length - 1) % tabs.length;
+        else if (e.key === 'Home') nextIndex = 0;
+        else if (e.key === 'End') nextIndex = tabs.length - 1;
+        else return;
+        e.preventDefault();
+        var next = tabs[nextIndex];
+        activate(next.id);
+        var nextButton = stageTabsEl.querySelector('#tab-' + next.id);
+        if (nextButton) nextButton.focus();
+      });
 
       var x = document.createElement('button');
       x.type = 'button';
       x.className = 'x';
       x.textContent = '×';
-      x.setAttribute('aria-label', 'Close tab');
+      x.setAttribute('aria-label', 'Close ' + (t.title || 'New tab'));
+      x.addEventListener('click', function () { closeTab(t.id); });
 
-      el.appendChild(label);
+      el.appendChild(select);
       el.appendChild(x);
-
-      el.addEventListener('click', function (e) {
-        if (e.target === x) return;
-        activate(t.id);
-      });
-      x.addEventListener('click', function (e) {
-        e.stopPropagation();
-        closeTab(t.id);
-      });
-
       stageTabsEl.appendChild(el);
     });
+    if (hadFocus && activeId) {
+      var focused = stageTabsEl.querySelector('#tab-' + activeId);
+      if (focused) focused.focus();
+    }
   }
 
   function activate(id) {
@@ -358,11 +367,11 @@
     var t = tabById(id);
     if (t) {
       stageAddr.value = t.url || '';
-      if (t.status === 'direct') setRelayChip('direct · no relay');
-      else if (t.status === 'failed') setRelayChip('relay failed', 'bad');
+      if (t.status === 'direct') setRelayChip('direct · bypasses server');
+      else if (t.status === 'failed') setRelayChip('server failed', 'bad');
       else if (t.status === 'stopped') setRelayChip('stopped');
       else if (t.status === 'routing') setRelayChip('routing…');
-      else setRelayChip(t.via ? 'via ' + t.via : 'relay idle', t.via ? 'ok' : '');
+      else setRelayChip(t.via ? 'via ' + t.via : 'server idle', t.via ? 'ok' : '');
       if (t.pane) t.pane.querySelector('.blank').classList.toggle('on', !t.url);
     }
     renderTabs();
@@ -373,16 +382,19 @@
 
     var pane = document.createElement('div');
     pane.className = 'pane';
+    pane.id = 'pane-' + t.id;
+    pane.setAttribute('role', 'tabpanel');
+    pane.setAttribute('aria-labelledby', 'tab-' + t.id);
     pane.innerHTML =
       '<div class="pane-top">' +
-        '<span class="relay-chip">relay</span>' +
+        '<span class="relay-chip">server</span>' +
         '<span class="pane-url"></span>' +
         '<span class="grow"></span>' +
         '<button type="button" data-act="back" title="Back" aria-label="Back">←</button>' +
         '<button type="button" data-act="forward" title="Forward" aria-label="Forward">→</button>' +
         '<button type="button" data-act="cancel">Stop</button>' +
         '<button type="button" data-act="reload">Reload page</button>' +
-        '<button type="button" data-act="reader">Reader</button>' +
+
         '<button type="button" data-act="direct">Direct</button>' +
         '<button type="button" data-act="open">Open</button>' +
       '</div>' +
@@ -391,7 +403,7 @@
       '<div class="blank"><div><b>Ready when you are</b><span>Paste a public page address above, then choose Open page.</span></div></div>' +
       '<div class="errbox"><div class="errcard"><h3>We could not open this page here</h3><p class="errmsg"></p>' +
         '<div class="row">' +
-          '<button class="btn accent" type="button" data-act="retry">Try the relays again</button>' +
+          '<button class="btn accent" type="button" data-act="retry">Retry server route</button>' +
           '<button class="btn" type="button" data-act="direct">Load direct</button>' +
           '<button class="btn" type="button" data-act="open">Open outside</button>' +
         '</div></div></div>';
@@ -414,7 +426,7 @@
       else if (act === 'forward') goHistory(t, 1);
       else if (act === 'reload') load(t, t.url, t.mode, true);
       else if (act === 'retry') load(t, t.url, 'proxy');
-      else if (act === 'reader') load(t, t.url, 'reader');
+
       else if (act === 'direct') load(t, t.url, 'direct');
       else if (act === 'cancel') {
         if (t.ctrl) t.ctrl.abort();
@@ -435,7 +447,6 @@
       historyIndex: -1,
       mode: 'proxy',
       status: 'idle',
-      bridgeToken: makeBridgeToken(),
       via: null,
       pane: null,
       frame: null,
@@ -491,7 +502,7 @@
 
   function recordHistory(t, url, mode) {
     if (t._historyNav) { t._historyNav = false; return; }
-    var entry = { url: url, mode: mode === 'reader' ? 'reader' : (mode === 'direct' ? 'direct' : 'proxy') };
+    var entry = { url: url, mode: mode === 'direct' ? 'direct' : 'proxy' };
     var current = t.history[t.historyIndex];
     if (current && current.url === entry.url && current.mode === entry.mode) return;
     if (t.historyIndex < t.history.length - 1) t.history = t.history.slice(0, t.historyIndex + 1);
@@ -514,7 +525,7 @@
       t._historyNav = false;
     }
     t.url = url;
-    t.mode = mode === 'direct' ? 'direct' : (mode === 'reader' ? 'reader' : 'proxy');
+    t.mode = mode === 'direct' ? 'direct' : 'proxy';
     t.status = 'routing';
     t.title = prettyHost(url);
     t.via = null;
@@ -526,7 +537,7 @@
     updateHistoryButtons(t);
 
     if (t.mode === 'direct') loadDirect(t, url);
-    else loadProxy(t, url, t.mode === 'reader');
+    else loadProxy(t, url);
   }
 
   function openTarget(url, mode) {
@@ -552,14 +563,14 @@
     t.viaEl.textContent = 'direct';
     t.urlEl.textContent = url;
     t.frame.removeAttribute('srcdoc');
-    t.frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals allow-downloads');
+    t.frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads');
     t.frame.onload = function () {
       if (t.destroyed || t.req !== my) return;
       clearTimeout(t.directTimer);
-      t.status = 'loaded';
+      t.status = 'direct';
       t.loaderEl.classList.remove('on');
       t.pane.classList.remove('loading');
-      setTabStatus(t, 'direct · loaded', 'ok');
+      setTabStatus(t, 'direct · frame attempted');
     };
     t.frame.onerror = function () {
       if (t.destroyed || t.req !== my) return;
@@ -584,134 +595,7 @@
     setTabStatus(t, 'direct · loading');
   }
 
-  var lastGood = null;
-
-  function orderedRelays() {
-    var list = RELAYS.slice();
-    if (lastGood) {
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].id === lastGood) {
-          var r = list.splice(i, 1)[0];
-          list.unshift(r);
-          break;
-        }
-      }
-    }
-    return list;
-  }
-
-  var MAX_RESPONSE_CHARS = 5 * 1024 * 1024;
-  var CHAIN_BUDGET_MS = 20000;
-  var BLOCK_MARKERS = [
-    /bots use DuckDuckGo too/i,
-    /Our systems have detected unusual traffic/i,
-    /unusual traffic from your computer network/i,
-    /are you a robot/i
-  ];
-
-  function fetchTimeout(url, ms, outer) {
-    var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, ms);
-    var onAbort = function () { ctrl.abort(); };
-    if (outer) {
-      if (outer.signal.aborted) ctrl.abort();
-      else outer.signal.addEventListener('abort', onAbort);
-    }
-    var done = function () {
-      clearTimeout(timer);
-      if (outer) outer.signal.removeEventListener('abort', onAbort);
-    };
-    return fetch(url, { signal: ctrl.signal, redirect: 'follow', cache: 'no-store' })
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text().then(function (text) {
-          return { text: text, contentType: r.headers.get('content-type') || '', status: r.status };
-        });
-      })
-      .then(function (response) {
-        done();
-        if (response.text.length > MAX_RESPONSE_CHARS) throw new Error('response too large');
-        return response;
-      }, function (e) { done(); throw e; });
-  }
-
-  function looksBlocked(text) {
-    for (var i = 0; i < BLOCK_MARKERS.length; i++) {
-      if (BLOCK_MARKERS[i].test(text)) return true;
-    }
-    return false;
-  }
-
-  function wrapReader(text, url) {
-    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(url) + '</title>' +
-      '<style>body{margin:0;padding:28px 32px;background:#0f0f16;color:#e7e7f0;' +
-      'font:13.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-wrap:break-word}' +
-      'b{display:block;color:#a78bfa;font:600 11px/1.4 ui-sans-serif,system-ui;letter-spacing:.1em;' +
-      'text-transform:uppercase;margin:0 0 20px}</style></head><body><b>reader · ' + escHtml(url) +
-      '</b>' + escHtml(text) + '</body></html>';
-  }
-
-  function unwrapRelayText(text) {
-    var raw = String(text || '');
-    try {
-      var parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.contents === 'string') return parsed.contents;
-      if (parsed && typeof parsed.body === 'string') return parsed.body;
-      if (parsed && typeof parsed.data === 'string') return parsed.data;
-    } catch (e) {}
-    return raw;
-  }
-
-  function wrapText(text, url, label) {
-    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(url) + '</title>' +
-      '<style>body{margin:0;padding:28px 32px;background:#0f0f16;color:#e7e7f0;' +
-      'font:13.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-wrap:break-word}' +
-      'b{display:block;color:#d5b06a;font:600 11px/1.4 ui-sans-serif,system-ui;letter-spacing:.1em;' +
-      'text-transform:uppercase;margin:0 0 20px}</style></head><body><b>' + escHtml(label || 'text') + ' · ' + escHtml(url) +
-      '</b>' + escHtml(text) + '</body></html>';
-  }
-
-  async function proxyFetch(target, onStatus, forceReader, outer) {
-    var relays = forceReader ? RELAYS.filter(function (r) { return r.wrap; }) : orderedRelays();
-    var deadline = Date.now() + CHAIN_BUDGET_MS;
-    var errors = [];
-
-    for (var i = 0; i < relays.length; i++) {
-      if (outer && outer.signal.aborted) throw new Error('cancelled');
-      var remaining = deadline - Date.now();
-      if (remaining < 500) {
-        errors.push('chain time budget exhausted');
-        break;
-      }
-      var r = relays[i];
-      if (onStatus) onStatus('relay ' + (i + 1) + '/' + relays.length + ' · ' + r.name);
-      try {
-        var response = await fetchTimeout(r.build(target), Math.min(r.timeout || 7000, remaining), outer);
-        var text = unwrapRelayText(response.text);
-        if (!text || text.length < 20) throw new Error('empty response');
-        if (r.wrap) {
-          text = wrapReader(text, target);
-        } else {
-          var contentType = String(response.contentType || '').toLowerCase();
-          var textual = /(?:text\/html|application\/xhtml\+xml|application\/json|application\/xml|text\/xml|text\/plain)/i.test(contentType);
-          if (!textual && !/<[a-z!]/i.test(text.slice(0, 2048))) throw new Error('non-text response; use Open outside');
-          if (looksBlocked(text)) throw new Error('provider is challenging the relay');
-          if (!/html|xhtml/i.test(contentType) && !/<(?:html|head|body)\b/i.test(text)) text = wrapText(text, target, contentType.split(';')[0] || 'text');
-        }
-        if (!r.wrap) lastGood = r.id;
-        markRelay(r.id);
-        return { html: text, via: r.name };
-      } catch (e) {
-        if (outer && outer.signal.aborted) throw new Error('cancelled');
-        var reason = e && e.name === 'AbortError' ? 'timeout' : (e && e.message ? e.message : 'failed');
-        errors.push(r.name + ' - ' + reason);
-        try { console.warn('[shadowproxy] relay failed', r.id, reason); } catch (x) {}
-      }
-    }
-    throw new Error('Every relay refused the request.\n\n' + errors.join('\n'));
-  }
-
-  async function loadProxy(t, url, forceReader) {
+  async function loadProxy(t, url) {
     ensurePane(t);
     if (t.ctrl) t.ctrl.abort();
     t.ctrl = new AbortController();
@@ -728,28 +612,26 @@
     setTabStatus(t, 'routing…');
 
     try {
-      var res = await proxyFetch(url, function (msg) {
-        if (t.req === my) setTabStatus(t, msg);
-      }, forceReader, ctrl);
+      if (location.protocol === 'file:') throw new Error('Server routing needs the deployed Vercel app. Open the online version instead.');
+      var response = await fetch('/api/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url }),
+        signal: ctrl.signal
+      });
+      if (!response.ok) throw new Error((await response.text()).slice(0, 200) || 'Server refused the address');
+      var res = await response.json();
+      if (!res.path || !/^\/r\/[A-Za-z0-9_-]+$/.test(res.path)) throw new Error('Invalid server route');
       if (t.destroyed || t.req !== my) return;
-
-      var html = res.html;
-      var titleMatch = html.match(/<title[^>]*>([\s\S]{1,160}?)<\/title>/i);
-      if (titleMatch) {
-        var clean = decodeEntities(titleMatch[1].replace(/\s+/g, ' ').trim());
-        if (clean) { t.title = clean.slice(0, 90); renderTabs(); }
-      }
-
-      t.frame.removeAttribute('src');
-      t.frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals allow-downloads');
-      t.frame.srcdoc = buildSrcdoc(html, url, t.bridgeToken);
+      t.frame.removeAttribute('srcdoc');
+      t.frame.setAttribute('sandbox', 'allow-popups');
+      t.frame.src = res.path;
       updateHistoryButtons(t);
-
-      t.via = res.via;
+      t.via = 'Vercel';
       t.status = 'loaded';
       t.loaderEl.classList.remove('on');
       t.pane.classList.remove('loading');
-      setTabStatus(t, 'via ' + res.via, 'ok');
+      setTabStatus(t, 'via Vercel', 'ok');
     } catch (err) {
       if (t.destroyed || t.req !== my) return;
       t.loaderEl.classList.remove('on');
@@ -762,58 +644,11 @@
       t.status = 'failed';
       t.errMsg.textContent = String(err && err.message ? err.message : err);
       t.errEl.classList.add('on');
-      setTabStatus(t, 'relay failed', 'bad');
+      setTabStatus(t, 'server failed', 'bad');
       try { console.warn('[shadowproxy] load failed', url, err && err.message); } catch (x) {}
     } finally {
       if (t.ctrl === ctrl) t.ctrl = null;
     }
-  }
-
-  function buildSrcdoc(html, baseUrl, bridgeToken) {
-    var out = String(html);
-    out = out.replace(/<base\b[^>]*>/gi, '');
-
-    var base = '<base href="' + escHtml(baseUrl) + '">';
-
-    if (/<head[^>]*>/i.test(out)) {
-      out = out.replace(/<head[^>]*>/i, function (m) { return m + base; });
-    } else if (/<html[^>]*>/i.test(out)) {
-      out = out.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + base + '</head>'; });
-    } else {
-      out = base + out;
-    }
-
-    var hook = '<scr' + 'ipt>(function(){' +
-      'function send(u){try{parent.postMessage({__sp:1,url:u,token:' + JSON.stringify(bridgeToken || '') + '},"*")}catch(e){}}' +
-      'document.addEventListener("click",function(e){' +
-        'var a=e.target&&e.target.closest?e.target.closest("a"):null;' +
-        'if(!a||!a.href)return;' +
-        'if(e.button!==0||e.defaultPrevented||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;' +
-        'if(a.target==="_blank"||a.hasAttribute("download"))return;' +
-        'if(!/^https?:/i.test(a.href))return;' +
-        'e.preventDefault();send(a.href);' +
-      '},true);' +
-      'document.addEventListener("submit",function(e){' +
-        'var f=e.target;if(!f||!f.action)return;' +
-        'if((f.method||"get").toLowerCase()!=="get"){' +
-          'e.preventDefault();' +
-          'try{parent.postMessage({__sp:1,kind:"blocked"},"*")}catch(x){}' +
-          'return;' +
-        '}' +
-        'var action=new URL(f.getAttribute("action")||document.baseURI,document.baseURI);action.hash="";' +
-        'var d=new FormData(f);d.forEach(function(v,k){if(typeof v==="string")action.searchParams.append(k,v)});' +
-        'e.preventDefault();send(action.href);' +
-      '},true);' +
-      'var ps=history.pushState,rs=history.replaceState;' +
-      'history.pushState=function(){var r=ps.apply(this,arguments);try{send(location.href)}catch(x){}return r};' +
-      'history.replaceState=function(){var r=rs.apply(this,arguments);try{send(location.href)}catch(x){}return r};' +
-      'addEventListener("popstate",function(){try{send(location.href)}catch(x){}});' +
-      '})();</scr' + 'ipt>';
-
-    if (/<\/body>/i.test(out)) out = out.replace(/<\/body>/i, hook + '</body>');
-    else out = out + hook;
-
-    return out;
   }
 
   var cloaked = false;
@@ -829,16 +664,15 @@
   function setCloak(on) {
     if (on) {
       var destination = getCloakUrl();
-      cloaked = true;
-      root.classList.add('cloaked');
-      if (cloakEl) cloakEl.setAttribute('aria-hidden', 'false');
-      document.title = FAKE_TITLE;
-      favicon.href = ICON_FAKE;
-      suspendFrames();
-      if (cloakExit) cloakExit.focus();
-      var popup = window.open(destination, '_blank', 'noopener,noreferrer');
-      if (!popup) toast('Cloak on - popup blocked');
-      else toast('Cloak on');
+      var popup = window.open('about:blank', '_blank');
+      if (popup) {
+        popup.opener = null;
+        popup.location.replace(destination);
+        toast('Cloak opened ' + prettyHost(destination));
+      } else {
+        toast('Popup blocked - opening the selected cloak site here');
+        window.location.assign(destination);
+      }
       return;
     }
     cloaked = false;
@@ -922,20 +756,55 @@
     w.document.close();
   }
 
+  var modalInertState = null;
+  var settingsReturnFocus = null;
+  var termsReturnFocus = null;
+
+  function activeModal() {
+    if (tosGate && tosGate.classList.contains('on')) return tosGate;
+    if (settingsPanel && settingsPanel.classList.contains('on')) return settingsPanel;
+    return null;
+  }
+
+  function syncModalInert() {
+    var modal = activeModal();
+    if (modal && !modalInertState) {
+      modalInertState = [];
+      Array.prototype.forEach.call(document.body.children, function (el) {
+        if (el === settingsPanel || el === tosGate || el.tagName === 'SCRIPT') return;
+        modalInertState.push({ el: el, inert: el.hasAttribute('inert') });
+        el.setAttribute('inert', '');
+      });
+    } else if (!modal && modalInertState) {
+      modalInertState.forEach(function (item) {
+        if (!item.inert) item.el.removeAttribute('inert');
+      });
+      modalInertState = null;
+    }
+    if (settingsPanel) {
+      if (modal && modal !== settingsPanel) settingsPanel.setAttribute('inert', '');
+      else settingsPanel.removeAttribute('inert');
+    }
+    if (tosGate) {
+      if (modal && modal !== tosGate) tosGate.setAttribute('inert', '');
+      else tosGate.removeAttribute('inert');
+    }
+  }
+
   function toggleSettings(open) {
     var visible = !!open;
     if (!settingsPanel) return;
+    if (visible) settingsReturnFocus = document.activeElement;
     settingsPanel.classList.toggle('on', visible);
     settingsPanel.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    syncModalInert();
     if (visible) {
-      settingsPanel._returnFocus = document.activeElement;
+      root.classList.add('locked');
       if (settingsInput) { settingsInput.value = getCloakUrl(); settingsInput.focus(); settingsInput.select(); }
-    } else if (settingsPanel._returnFocus) {
-      settingsPanel._returnFocus.focus();
-      settingsPanel._returnFocus = null;
+    } else {
+      if (!activeModal() && !stage.classList.contains('on')) root.classList.remove('locked');
+      if (settingsReturnFocus && settingsReturnFocus.isConnected) settingsReturnFocus.focus();
     }
-    if (visible) root.classList.add('locked');
-    else if (!tosGate || !tosGate.classList.contains('on')) root.classList.remove('locked');
   }
 
   function bindSettings() {
@@ -958,17 +827,43 @@
     if (tosAccept) tosAccept.addEventListener('click', function () {
       try { localStorage.setItem('sp.tosAccepted', '1'); } catch (e) {}
       if (tosGate) { tosGate.classList.remove('on'); tosGate.setAttribute('aria-hidden', 'true'); }
-      root.classList.remove('locked');
-      homeInput.focus();
+      syncModalInert();
+      if (!activeModal() && !stage.classList.contains('on')) root.classList.remove('locked');
+      if (termsReturnFocus && termsReturnFocus.isConnected && termsReturnFocus !== document.body) termsReturnFocus.focus();
+      else if (stage.classList.contains('on')) stageAddr.focus();
+      else homeInput.focus();
     });
     if (tosGate && tosGate.classList.contains('on')) root.classList.add('locked');
+    document.addEventListener('keydown', function (e) {
+      var modal = activeModal();
+      if (!modal) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (modal === settingsPanel) toggleSettings(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      var focusable = Array.prototype.filter.call(
+        modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'),
+        function (el) { return el.getClientRects().length > 0; }
+      );
+      if (!focusable.length) { e.preventDefault(); return; }
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
   }
 
   function showTerms() {
     if (!tosGate) return;
+    termsReturnFocus = document.activeElement;
     tosGate.classList.add('on');
     tosGate.setAttribute('aria-hidden', 'false');
     root.classList.add('locked');
+    syncModalInert();
     if (tosAccept) tosAccept.focus();
   }
 
@@ -978,19 +873,20 @@
     if (accepted && tosGate) {
       tosGate.classList.remove('on');
       tosGate.setAttribute('aria-hidden', 'true');
-      root.classList.remove('locked');
+      if (!stage.classList.contains('on')) root.classList.remove('locked');
+      syncModalInert();
     } else if (tosGate) showTerms();
   }
 
   function bindStage() {
     $('#stageBack').addEventListener('click', function () {
       hideStage();
-      setRelayChip('relay idle');
+      setRelayChip('server idle');
     });
 
     $('#stageClose').addEventListener('click', function () {
       hideStage();
-      setRelayChip('relay idle');
+      setRelayChip('server idle');
     });
 
     $('#stageNew').addEventListener('click', function () {
@@ -1039,40 +935,9 @@
 
   function bindKeys() {
     document.addEventListener('keydown', function (e) {
+      if (activeModal()) return;
       var tag = (e.target && e.target.tagName || '').toLowerCase();
       var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
-      var settingsOpen = settingsPanel && settingsPanel.classList.contains('on');
-      var termsOpen = tosGate && tosGate.classList.contains('on');
-      var activeDialog = settingsOpen ? settingsPanel : (termsOpen ? tosGate : null);
-
-      if (activeDialog) {
-        if (e.key === 'Escape' && settingsOpen) {
-          e.preventDefault();
-          toggleSettings(false);
-          return;
-        }
-        if (e.key === 'Tab') {
-          var dialogCard = activeDialog.querySelector('[role="dialog"]');
-          var controls = dialogCard ? Array.prototype.slice.call(dialogCard.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')).filter(function (control) {
-            return control.offsetParent !== null;
-          }) : [];
-          if (controls.length) {
-            var first = controls[0];
-            var last = controls[controls.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-              e.preventDefault();
-              last.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-              e.preventDefault();
-              first.focus();
-            } else if (!dialogCard.contains(document.activeElement)) {
-              e.preventDefault();
-              (e.shiftKey ? last : first).focus();
-            }
-          }
-          return;
-        }
-      }
 
       if (e.key === '`' && !typing) {
         e.preventDefault();
@@ -1107,50 +972,10 @@
     });
   }
 
-  window.addEventListener('message', function (e) {
-    var d = e.data;
-    if (!d || typeof d !== 'object' || d.__sp !== 1) return;
-
-    var t = tabByFrame(e.source);
-    if (!t || !t.pane) return;
-
-    var frameWin = t.frame && t.frame.contentWindow;
-    if (!frameWin || e.source !== frameWin) return;
-    if (d.token !== t.bridgeToken) return;
-
-    if (d.kind === 'blocked') {
-      toast('That form posts data - the relay can only carry GET requests.');
-      return;
-    }
-    if (typeof d.url !== 'string' || !/^https?:\/\//i.test(d.url)) return;
-    load(t, d.url, t.mode === 'direct' ? 'proxy' : t.mode);
-  });
-
   function buildChain() {
     var row = $('#chainRow');
     if (!row) return;
-    row.innerHTML = '';
-    RELAYS.forEach(function (r, i) {
-      if (i) {
-        var arrow = document.createElement('span');
-        arrow.className = 'chain-arrow';
-        arrow.textContent = '→';
-        row.appendChild(arrow);
-      }
-      var pill = document.createElement('span');
-      pill.className = 'relay-pill';
-      pill.setAttribute('data-relay', r.id);
-      var dot = document.createElement('i');
-      pill.appendChild(dot);
-      pill.appendChild(document.createTextNode(r.name));
-      row.appendChild(pill);
-    });
-  }
-
-  function markRelay(id) {
-    $$('.relay-pill').forEach(function (p) {
-      p.classList.toggle('hot', p.getAttribute('data-relay') === id);
-    });
+    row.textContent = 'Browser → Vercel → public page';
   }
 
   function formatBytes(value) {
@@ -1221,7 +1046,7 @@
     var savedMode = 'proxy';
     try {
       var m = localStorage.getItem('sp.mode');
-      if (m === 'direct' || m === 'tab' || m === 'proxy' || m === 'reader') savedMode = m;
+      if (m === 'direct' || m === 'tab' || m === 'proxy') savedMode = m;
     } catch (e) {}
     stageMode.value = savedMode;
     stageMode.addEventListener('change', function () {

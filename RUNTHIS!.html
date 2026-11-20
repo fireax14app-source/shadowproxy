@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="dark light" />
-<meta name="description" content="ShadowProxy - a single-file, client-side web proxy. Paste a link, read it through a public CORS relay, sandboxed and rewritten. No server, no account." />
+<meta name="description" content="ShadowProxy routes public pages through its Vercel server using opaque addresses." />
 <title>ShadowProxy - by Fireax14</title>
 <link id="favicon" rel="icon" type="image/png" href="assets/shadowproxy-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,7 +22,7 @@
 </head>
 <body>
 <div class="pointer-light" id="pointerLight" aria-hidden="true"></div>
-<div class="boot-loader" id="bootLoader" role="status" aria-live="polite" aria-label="Loading ShadowProxy"><div class="boot-orbit" aria-hidden="true"><span></span><span></span><span></span></div><div class="boot-copy"><b>Shadow<span>Proxy</span></b><small>initializing relay chain</small></div><div class="boot-progress" aria-hidden="true"><i></i></div></div>
+<div class="boot-loader" id="bootLoader" role="status" aria-live="polite" aria-label="Loading ShadowProxy"><div class="boot-orbit" aria-hidden="true"><span></span><span></span><span></span></div><div class="boot-copy"><b>Shadow<span>Proxy</span></b><small>starting server route</small></div><div class="boot-progress" aria-hidden="true"><i></i></div></div>
 <header class="top" id="top">
   <div class="wrap top-in">
     <a class="brand" href="#top" aria-label="ShadowProxy home">
@@ -55,10 +55,10 @@
     <div class="hero-bg" id="heroBg" aria-hidden="true"></div>
     <div class="hero-scrim" aria-hidden="true"></div>
     <div class="wrap hero-in">
-      <p class="kicker" data-reveal>client-side relay · v4 modular</p>
+      <p class="kicker" data-reveal>server-routed · v5</p>
       <h1 data-reveal style="--i:1">Open a public page.</h1>
       <p class="lede" data-reveal style="--i:2">
-        Enter an address or search term. Public relays may be unavailable.
+        Enter an address or search term. Public pages load through the Vercel server.
       </p>
       <form class="search" id="homeForm" data-reveal style="--i:3" autocomplete="off">
         <svg class="s-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -71,7 +71,7 @@
       <div class="under" data-reveal style="--i:4">
         <span><span class="kbd">/</span> to focus</span>
         <span class="sep"></span>
-        <span>relay chain</span>
+        <span>server route</span>
         <span class="sep"></span>
         <span><b>36</b> launch targets</span>
         <span class="sep"></span>
@@ -101,33 +101,33 @@
         <div data-reveal>
           <p class="eyebrow">02 / Routing</p>
           <h2>How it loads</h2>
-          <p class="sec-sub">Documents use public relays. Assets may load directly.</p>
+          <p class="sec-sub">Server mode loads public pages and supported assets through Vercel. Direct mode and cloaked windows connect to the site.</p>
         </div>
       </div>
       <div class="cards3">
         <div class="card" data-reveal>
           <span class="card-num">01 / FETCH</span>
           <h3>Fetch</h3>
-          <p>A public relay retrieves the document. Assets may load directly. This does not hide your identity.</p>
-          <span class="tag">cors.dev · allorigins · cors.lol</span>
+          <p>The Vercel server fetches a public page. Private network addresses are blocked.</p>
+          <span class="tag">Vercel Function · public HTTP(S)</span>
         </div>
         <div class="card" data-reveal style="--i:1">
           <span class="card-num">02 / REWRITE</span>
           <h3>Rewrite</h3>
-          <p>Relative URLs point to the original site. Ordinary links route back through this app.</p>
-          <span class="tag">base injection · csp strip</span>
+          <p>Links and supported assets receive opaque server addresses.</p>
+          <span class="tag">encrypted URL token · HTML rewrite</span>
         </div>
         <div class="card" data-reveal style="--i:2">
           <span class="card-num">03 / SERVE</span>
           <h3>Display</h3>
-          <p>The result opens in a sandboxed frame. Sign-ins and complex apps may not work.</p>
-          <span class="tag">sandboxed srcdoc · per-tab state</span>
+          <p>The result opens in a sandboxed frame. Scripts and forms are disabled; complex apps will not work.</p>
+          <span class="tag">sandboxed frame · per-tab state</span>
         </div>
       </div>
       <div class="chain" data-reveal>
-        <span class="chain-label">relay chain</span>
+        <span class="chain-label">server route</span>
         <div class="chain-row" id="chainRow"></div>
-        <span class="chain-note">failover left → right</span>
+        <span class="chain-note">opaque address per request</span>
       </div>
     </div>
   </section>
@@ -155,12 +155,12 @@
         <div class="tool" data-reveal style="--i:2">
           <img class="tool-image" src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
           <h3>Cloaked window</h3>
-          <p>Open the current page in an <code>about:blank</code> popup. Some sites may refuse to appear inside its frame.</p>
+          <p>Open the current page directly in an <code>about:blank</code> popup. This bypasses the server route, and some sites refuse framing.</p>
         </div>
         <div class="tool" data-reveal style="--i:3">
           <img class="tool-image" src="https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=640&q=80&fm=jpg" alt="" loading="lazy" decoding="async" />
-          <h3>Reader fallback</h3>
-          <p>When a page fights the frame, Reader pulls a text-only copy through the last relay in the chain.</p>
+          <h3>Known limits</h3>
+          <p>Server mode is for public documents. Script-heavy sites, logins, and forms are not supported.</p>
         </div>
       </div>
     </div>
@@ -168,17 +168,17 @@
 
   <section class="sec alt" id="usage">
     <div class="wrap">
-      <div class="sec-head"><div data-reveal><p class="eyebrow">04 - usage</p><h2>What this tab is using.</h2><p class="sec-sub">A lightweight browser app with live diagnostics, a public relay chain, and no install step.</p></div></div>
+      <div class="sec-head"><div data-reveal><p class="eyebrow">04 - usage</p><h2>What this tab is using.</h2><p class="sec-sub">A lightweight browser app with live diagnostics, a public server route, and no install step.</p></div></div>
       <div class="usage-grid">
         <article class="usage-card" data-reveal><span class="usage-kicker">LIVE MEMORY</span><strong id="usageMemory">checking…</strong><p id="usageMemoryNote">Chromium exposes heap metrics; other browsers report availability.</p><button class="btn ghost usage-refresh" id="usageRefresh" type="button">Refresh</button></article>
         <article class="usage-card" data-reveal style="--i:1"><span class="usage-kicker">APP FOOTPRINT</span><strong id="usageFootprint">local modules</strong><p>HTML, CSS, and JavaScript are loaded from the same folder. No build tool or server is required for the local entrypoint.</p></article>
-        <article class="usage-card" data-reveal style="--i:2"><span class="usage-kicker">ROUTING LIMITS</span><strong>4 paths · 20s</strong><p>Public relays can fail or rate-limit requests. The chain has a 20-second budget; Reader is a text-only fallback.</p></article>
+        <article class="usage-card" data-reveal style="--i:2"><span class="usage-kicker">ROUTING LIMITS</span><strong>5 MB · 10s</strong><p>Public HTTP(S) pages only. Private addresses, scripts, forms, and large responses are blocked.</p></article>
       </div>
-      <div class="platform-strip" data-reveal><span class="platform-label">SUPPORTED ENVIRONMENTS</span><span class="platform-pill">Linux</span><span class="platform-pill">macOS</span><span class="platform-pill">Windows</span><span class="platform-pill">Chrome</span><span class="platform-note">Modern browser · file:// or local host</span></div>
+      <div class="platform-strip" data-reveal><span class="platform-label">SUPPORTED ENVIRONMENTS</span><span class="platform-pill">Linux</span><span class="platform-pill">macOS</span><span class="platform-pill">Windows</span><span class="platform-pill">Chrome</span><span class="platform-note">Modern browser · Vercel deployment</span></div>
     </div>
   </section>
   <section class="sec" id="credits">
-    <div class="wrap"><div class="sec-head"><div data-reveal><p class="eyebrow">05 - credits</p><h2>Built with open web standards.</h2><p class="sec-sub">ShadowProxy is assembled by Fireax14. The original project code is MIT licensed; relay services and destination sites remain independent third parties.</p></div></div><div class="cards3"><div class="card" data-reveal><span class="card-num">DESIGN</span><h3>ShadowProxy</h3><p>Interface, themes, keyboard flow, loading screen, and modular handoff.</p><span class="tag">by Fireax14</span></div><div class="card" data-reveal style="--i:1"><span class="card-num">SAFETY</span><h3>Public pages only</h3><p>Do not enter passwords, payment details, private messages, or other secrets into a relayed page.</p><span class="tag">MIT code · third-party services</span></div><div class="card" data-reveal style="--i:2"><span class="card-num">LICENSE</span><h3>MIT License</h3><p>See the repository LICENSE file for the original code grant and warranty disclaimer.</p><span class="tag">open source</span></div></div></div>
+    <div class="wrap"><div class="sec-head"><div data-reveal><p class="eyebrow">05 - credits</p><h2>Built with open web standards.</h2><p class="sec-sub">ShadowProxy is assembled by Fireax14. The original project code is MIT licensed; destination sites remain independent third parties.</p></div></div><div class="cards3"><div class="card" data-reveal><span class="card-num">DESIGN</span><h3>ShadowProxy</h3><p>Interface, themes, keyboard flow, loading screen, and modular handoff.</p><span class="tag">by Fireax14</span></div><div class="card" data-reveal style="--i:1"><span class="card-num">SAFETY</span><h3>Public pages only</h3><p>Do not enter passwords, payment details, private messages, or other secrets into a routed page.</p><span class="tag">MIT code · third-party services</span></div><div class="card" data-reveal style="--i:2"><span class="card-num">LICENSE</span><h3>MIT License</h3><p>See the repository LICENSE file for the original code grant and warranty disclaimer.</p><span class="tag">open source</span></div></div></div>
   </section>
 </main>
 
@@ -189,14 +189,14 @@
         <span class="mark foot-mark"><img src="assets/shadowproxy-icon.png" alt="" width="26" height="26" loading="lazy" /></span>
         ShadowProxy
       </div>
-      <p>Client-side modules, no analytics, no account system, and no first-party cookies. Relay traffic is visible to the relay operator - use public pages, not secrets.</p>
+      <p>The Vercel server fetches public pages. No analytics or account system. Do not enter secrets.</p>
     </div>
     <div class="foot-right">
       <div class="foot-col">
         <b>Build</b>
         <span>v4 · modular local files</span>
         <span>36 targets · 6 themes</span>
-        <span>4 relays · 1 search</span>
+        <span>Vercel route · 1 search</span>
       </div>
       <div class="foot-col">
         <b>Keys</b>
@@ -227,8 +227,8 @@
     <div class="stage-tabs" id="stageTabs" role="tablist" aria-label="Open pages"></div>
     <button class="stage-new" id="stageNew" type="button" title="New tab">+</button>
     <div class="stage-acts">
-      <span class="relay-chip" id="relayChip">relay idle</span>
-      <button class="icon-btn" id="stealthBtn" type="button" title="Open in cloaked window">
+      <span class="relay-chip" id="relayChip">server idle</span>
+      <button class="icon-btn" id="stealthBtn" type="button" title="Open direct in cloaked window" aria-label="Open direct in cloaked window">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
       </button>
       <button class="icon-btn" id="stageClose" type="button" title="Close viewer">
@@ -244,7 +244,7 @@
       <label class="sr-only" for="stageMode">Load mode</label>
       <select id="stageMode">
         <option value="proxy">Proxy</option>
-        <option value="reader">Reader</option>
+
         <option value="direct">Direct</option>
         <option value="tab">New tab</option>
       </select>
@@ -302,8 +302,8 @@
 </div>
 
 
-<div class="settings-panel" id="settingsPanel" aria-hidden="true"><div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="settings-head"><div><p class="eyebrow">preferences</p><h2 id="settingsTitle">Settings</h2></div><button class="icon-btn" id="settingsClose" type="button" aria-label="Close settings">×</button></div><label for="cloakUrl">Cloak destination</label><p class="settings-help">Choose the website shown by the Cloak button and the backtick or panic shortcut.</p><input id="cloakUrl" type="url" inputmode="url" placeholder="https://www.google.com/" autocomplete="off" spellcheck="false" /><div class="settings-actions"><button class="btn accent" id="settingsSave" type="button">Save</button><button class="btn" id="settingsReset" type="button">Reset</button></div></div></div>
-<div class="tos-gate on" id="tosGate" aria-hidden="false"><div class="tos-card" role="dialog" aria-modal="true" aria-labelledby="tosTitle"><p class="eyebrow">before you launch</p><h2 id="tosTitle">Terms of use</h2><p>ShadowProxy is a client-side tool for public web pages. Relay operators may see the URLs and content they handle. Do not enter passwords, payment information, private messages, or other sensitive data.</p><p>Use it only for lawful purposes and respect destination-site terms, copyright, access rules, and applicable policies. The original ShadowProxy code is available under the MIT License; third-party services and content keep their own terms.</p><div class="tos-actions"><button class="btn accent" id="tosAccept" type="button">Accept &amp; continue</button><a href="#credits">Read credits</a></div></div></div>
+<div class="settings-panel" id="settingsPanel" aria-hidden="true"><div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="settings-head"><div><p class="eyebrow">preferences</p><h2 id="settingsTitle">Settings</h2></div><button class="icon-btn" id="settingsClose" type="button" aria-label="Close settings">×</button></div><label for="cloakUrl">Cloak destination</label><p class="settings-help">When you press Cloak, ShadowProxy opens this website in a new tab.</p><input id="cloakUrl" type="url" inputmode="url" placeholder="https://www.google.com/" autocomplete="off" spellcheck="false" /><div class="settings-actions"><button class="btn accent" id="settingsSave" type="button">Save</button><button class="btn" id="settingsReset" type="button">Reset</button></div></div></div>
+<div class="tos-gate on" id="tosGate" aria-hidden="false"><div class="tos-card" role="dialog" aria-modal="true" aria-labelledby="tosTitle"><p class="eyebrow">before you launch</p><h2 id="tosTitle">Terms of use</h2><p>ShadowProxy routes public pages through a Vercel server. The server operator can see requested URLs. Do not enter passwords, payment information, private messages, or other sensitive data.</p><p>Use it only for lawful purposes and respect destination-site terms, copyright, access rules, and applicable policies. The original ShadowProxy code is available under the MIT License; third-party services and content keep their own terms.</p><div class="tos-actions"><button class="btn accent" id="tosAccept" type="button">Accept &amp; continue</button><a href="#credits">Read credits</a></div></div></div>
 
 <div class="toast" id="toast"></div>
 

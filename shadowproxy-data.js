@@ -53,10 +53,4 @@ window.ShadowProxyData.LINKS = [
     { n: 'Speedtest',     u: 'https://www.speedtest.net',           c: 'tools' },
     { n: 'OpenStreetMap', u: 'https://www.openstreetmap.org',       c: 'tools' }
   ];
-window.ShadowProxyData.RELAYS = [
-    { id: 'corsdev',    name: 'cors.dev',       kind: 'html',   build: function (u) { return 'https://proxy.cors.dev/' + u; } },
-    { id: 'allorigins', name: 'AllOrigins',     kind: 'html',   optional: true, build: function (u) { return 'https://api.allorigins.win/raw?' + new URLSearchParams({ url: u }).toString(); } },
-    { id: 'corslol',    name: 'cors.lol',       kind: 'html',   optional: true, build: function (u) { return 'https://api.cors.lol/?' + new URLSearchParams({ url: u }).toString(); } },
-    { id: 'reader',     name: 'Jina Reader',    kind: 'reader', build: function (u) { return 'https://r.jina.ai/' + u; }, wrap: true }
-  ];
 window.ShadowProxyData.SEARCH = function (q) { return 'https://www.bing.com/search?q=' + encodeURIComponent(q); };

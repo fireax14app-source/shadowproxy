@@ -1,31 +1,19 @@
 # ShadowProxy
 
-A client-side viewer for public web pages. Public relays may fail, and page assets may load directly.
+ShadowProxy opens public pages through a Vercel Function. Each request gets a randomized, encrypted `/r/…` address. The server fetches the page; the browser does not call public CORS relays. Supported images and stylesheets are routed through the same server. Scripts and forms in fetched pages are disabled, so sign-ins and complex apps will not work. Direct mode and cloaked windows bypass server routing.
 
-Do not enter passwords, payment details, private messages, or other sensitive information. Relay operators can see traffic sent through their services.
+## Run
 
-## Download
+Use the deployed Vercel app at `/RUNTHIS!.html`. Opening the downloaded HTML from `file://` shows the interface but **server routing requires the deployment**. Do not enter passwords or other private information.
 
-1. Open **Code** on [this repository](https://github.com/fireax14app-source/shadowproxy).
-2. Select **Download ZIP**. Wait for the download and extract it.
-3. In the extracted folder, double-click **RUNTHIS!.html**. Keep `shadowproxy.css`, `shadowproxy-data.js`, `shadowproxy-app.js`, and `assets/` beside it.
+## Deploy to Vercel
 
-![GitHub Code button](assets/guide/01-code.png)
+Connect this GitHub repository to a Vercel project. Set `ROUTE_SECRET` to a unique random value of at least 32 characters in Production and Preview. Deploy. The Vercel server needs outbound network access to public HTTP(S) sites. The static GitHub Pages guide is not a routing server.
 
-![Download ZIP menu item](assets/guide/02-zip.png)
+## Checks
 
-![RUNTHIS!.html in the extracted folder](assets/guide/03-open.png)
-
-[Visual download guide](https://fireax14app-source.github.io/shadowproxy/) · [Open online](https://fireax14app-source.github.io/shadowproxy/RUNTHIS!.html)
-
-## Troubleshooting
-
-- Use a modern browser. ShadowProxy works with `file://` and local hosting.
-- If a public relay fails, try another load mode or open the page outside ShadowProxy.
-- If a page refuses to load in a frame, use **Direct** or **Open**. Some websites block frames.
-- If downloads or popups are blocked, allow them for the local page or local website.
-- Public relays are third-party services. They may be unavailable or rate-limited.
+Run `node --test tests/*.test.js`, `node --check shadowproxy-app.js`, and `node --check api/route.js`.
 
 ## License
 
-The original project code uses the MIT License. Destination sites and public relay services have their own terms.
+MIT for the original project code. Destination sites keep their own terms.
