@@ -552,7 +552,7 @@
     t.viaEl.textContent = 'direct';
     t.urlEl.textContent = url;
     t.frame.removeAttribute('srcdoc');
-    t.frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads');
+    t.frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals allow-downloads');
     t.frame.onload = function () {
       if (t.destroyed || t.req !== my) return;
       clearTimeout(t.directTimer);
@@ -771,15 +771,7 @@
 
   function buildSrcdoc(html, baseUrl, bridgeToken) {
     var out = String(html);
-
-    out = out.replace(/<meta[^>]+http-equiv\s*=\s*["']?content-security-policy["']?[^>]*>/gi, '');
-    out = out.replace(/<meta[^>]+http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, '');
     out = out.replace(/<base\b[^>]*>/gi, '');
-
-    out = out.replace(
-      /if\s*\(\s*(?:window\.)?top\s*!=\s*(?:window\.)?self\s*\)\s*\{?\s*(?:window\.)?top\.location(?:\.href)?\s*=\s*(?:window\.)?self\.location(?:\.href)?\s*;?\s*\}?/gi,
-      ''
-    );
 
     var base = '<base href="' + escHtml(baseUrl) + '">';
 
@@ -837,13 +829,16 @@
   function setCloak(on) {
     if (on) {
       var destination = getCloakUrl();
+      cloaked = true;
+      root.classList.add('cloaked');
+      if (cloakEl) cloakEl.setAttribute('aria-hidden', 'false');
+      document.title = FAKE_TITLE;
+      favicon.href = ICON_FAKE;
+      suspendFrames();
+      if (cloakExit) cloakExit.focus();
       var popup = window.open(destination, '_blank', 'noopener,noreferrer');
-      if (!popup) {
-        toast('Popup blocked - opening the selected cloak site here');
-        window.location.assign(destination);
-      } else {
-        toast('Cloak opened ' + prettyHost(destination));
-      }
+      if (!popup) toast('Cloak on - popup blocked');
+      else toast('Cloak on');
       return;
     }
     cloaked = false;
@@ -932,7 +927,13 @@
     if (!settingsPanel) return;
     settingsPanel.classList.toggle('on', visible);
     settingsPanel.setAttribute('aria-hidden', visible ? 'false' : 'true');
-    if (visible && settingsInput) { settingsInput.value = getCloakUrl(); settingsInput.focus(); settingsInput.select(); }
+    if (visible) {
+      settingsPanel._returnFocus = document.activeElement;
+      if (settingsInput) { settingsInput.value = getCloakUrl(); settingsInput.focus(); settingsInput.select(); }
+    } else if (settingsPanel._returnFocus) {
+      settingsPanel._returnFocus.focus();
+      settingsPanel._returnFocus = null;
+    }
     if (visible) root.classList.add('locked');
     else if (!tosGate || !tosGate.classList.contains('on')) root.classList.remove('locked');
   }
@@ -968,6 +969,7 @@
     tosGate.classList.add('on');
     tosGate.setAttribute('aria-hidden', 'false');
     root.classList.add('locked');
+    if (tosAccept) tosAccept.focus();
   }
 
   function initTerms() {
@@ -1039,6 +1041,38 @@
     document.addEventListener('keydown', function (e) {
       var tag = (e.target && e.target.tagName || '').toLowerCase();
       var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+      var settingsOpen = settingsPanel && settingsPanel.classList.contains('on');
+      var termsOpen = tosGate && tosGate.classList.contains('on');
+      var activeDialog = settingsOpen ? settingsPanel : (termsOpen ? tosGate : null);
+
+      if (activeDialog) {
+        if (e.key === 'Escape' && settingsOpen) {
+          e.preventDefault();
+          toggleSettings(false);
+          return;
+        }
+        if (e.key === 'Tab') {
+          var dialogCard = activeDialog.querySelector('[role="dialog"]');
+          var controls = dialogCard ? Array.prototype.slice.call(dialogCard.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')).filter(function (control) {
+            return control.offsetParent !== null;
+          }) : [];
+          if (controls.length) {
+            var first = controls[0];
+            var last = controls[controls.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            } else if (!dialogCard.contains(document.activeElement)) {
+              e.preventDefault();
+              (e.shiftKey ? last : first).focus();
+            }
+          }
+          return;
+        }
+      }
 
       if (e.key === '`' && !typing) {
         e.preventDefault();
