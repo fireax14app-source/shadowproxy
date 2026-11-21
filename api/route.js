@@ -149,8 +149,8 @@ function rewriteHtml(body, base) {
   let html = body.toString('utf8');
   // Keep external bundles: many sites render their useful content after the
   // initial HTML. Inline code remains disabled, and the viewer sandbox keeps
-  // retained bundles away from the parent application.
-  html = html.replace(/<script\b([^>]*?)\bsrc\s*=\s*(["'])([^"']+)\2([^>]*)>[\s\S]*?<\/script\s*>/gi, (_m, before, quote, value, after) => '<script' + before + 'src=' + quote + routeUrl(value.replace(/&amp;/g, '&'), base) + quote + after + '></script>');
+  // retained bundles away from the parent application. Resource attributes
+  // are routed once below, so script URLs are not double-routed.
   html = html.replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*>[\s\S]*?<\/script\s*>/gi, '').replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*\/?>/gi, '');
   html = html.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
   html = html.replace(/<base\b[^>]*>/gi, '').replace(/<meta\b[^>]*http-equiv\s*=\s*["']?(?:refresh|content-security-policy)["']?[^>]*>/gi, '');
