@@ -97,7 +97,11 @@ function securityHeaders(res) {
 async function resolvePublic(hostname) {
   const records = await dns.lookup(hostname, { all: true, verbatim: true });
   if (!records.length || records.some(record => !publicAddress(record.address))) throw new Error('Private or unresolved address blocked');
-  return records[Math.floor(Math.random() * records.length)];
+  // Vercel regions do not guarantee outbound IPv6 reachability. Prefer a
+  // validated IPv4 address when one exists, while retaining IPv6 fallback.
+  const ipv4 = records.filter(record => record.family === 4);
+  const pool = ipv4.length ? ipv4 : records;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 async function fetchPublic(target, redirects = 0) {
