@@ -122,7 +122,7 @@ async function fetchPublic(target, redirects = 0) {
         return resolve(fetchPublic(next, redirects + 1));
       }
       const type = String(response.headers['content-type'] || 'application/octet-stream').split(';')[0].toLowerCase();
-      if (!/^(text\/html|application\/xhtml\+xml|text\/plain|text\/css|image\/(png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon)|font\/(woff|woff2)|application\/font-woff)$/.test(type)) {
+      if (!/^(text\/html|application\/xhtml\+xml|text\/plain|text\/css|text\/javascript|application\/(javascript|ecmascript)|image\/(png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon)|font\/(woff|woff2)|application\/font-woff)$/.test(type)) {
         response.destroy(); return reject(new Error('Unsupported content type'));
       }
       if (Number(response.headers['content-length']) > MAX_BYTES) { response.destroy(); return reject(new Error('Response too large')); }
