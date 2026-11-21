@@ -580,7 +580,9 @@
       var path = await routePath(url, ctrl.signal);
       if (t.destroyed || t.req !== my) return;
       t.frame.removeAttribute('srcdoc');
-      t.frame.setAttribute('sandbox', '');
+      // External site bundles may run inside the opaque-origin iframe. The
+      // empty sandbox preserves isolation from ShadowProxy and the parent app.
+      t.frame.setAttribute('sandbox', 'allow-scripts');
       t.frame.src = path;
       updateHistoryButtons(t);
       t.via = 'Vercel';

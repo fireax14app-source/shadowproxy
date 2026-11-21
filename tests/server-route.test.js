@@ -34,11 +34,12 @@ test('private destinations and credentials are refused', () => {
   for (const address of ['1.1.1.1', '2606:4700:4700::1111']) assert.equal(route.publicAddress(address), true);
 });
 
-test('HTML routes ordinary resources and removes scripts and handlers', () => {
-  const html = route.rewriteHtml(Buffer.from('<html><head><script>alert(1)</script><link href="/site.css"></head><body onload="alert(1)"><img src="/image.png"><a href="/next">Next</a></body></html>'), 'https://example.com/start');
-  assert.doesNotMatch(html, /<script|onload=/i);
+test('HTML routes resources, retains external bundles, and removes inline code', () => {
+  const html = route.rewriteHtml(Buffer.from('<html><head><script src="/app.js"></script><script>alert(1)</script><link href="/site.css"></head><body onload="alert(1)"><img src="/image.png"><a href="/next">Next</a></body></html>'), 'https://example.com/start');
+  assert.match(html, /<script[^>]+src="\/r\//i);
+  assert.doesNotMatch(html, /<script>alert|onload=/i);
   assert.doesNotMatch(html, /https:\/\/example\.com/);
-  assert.equal((html.match(/\/r\//g) || []).length, 3);
+  assert.equal((html.match(/\/r\//g) || []).length, 4);
 });
 
 test('POST creates a path and GET fetches through the server', { skip: process.env.LIVE_ROUTE_TEST !== '1' }, async () => {

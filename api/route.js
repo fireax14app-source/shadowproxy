@@ -147,7 +147,11 @@ function routeUrl(value, base) {
 
 function rewriteHtml(body, base) {
   let html = body.toString('utf8');
-  html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '').replace(/<script\b[^>]*\/?>/gi, '');
+  // Keep external bundles: many sites render their useful content after the
+  // initial HTML. Inline code remains disabled, and the viewer sandbox keeps
+  // retained bundles away from the parent application.
+  html = html.replace(/<script\b([^>]*?)\bsrc\s*=\s*(["'])([^"']+)\2([^>]*)>[\s\S]*?<\/script\s*>/gi, (_m, before, quote, value, after) => '<script' + before + 'src=' + quote + routeUrl(value.replace(/&amp;/g, '&'), base) + quote + after + '></script>');
+  html = html.replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*>[\s\S]*?<\/script\s*>/gi, '').replace(/<script\b(?![^>]*\bsrc\s*=)[^>]*\/?>/gi, '');
   html = html.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
   html = html.replace(/<base\b[^>]*>/gi, '').replace(/<meta\b[^>]*http-equiv\s*=\s*["']?(?:refresh|content-security-policy)["']?[^>]*>/gi, '');
   html = html.replace(/\b(src|href|poster)\s*=\s*(["'])([^"']*)\2/gi, (_m, attr, quote, value) => attr + '=' + quote + routeUrl(value.replace(/&amp;/g, '&'), base).replace(/&/g, '&amp;') + quote);
@@ -179,7 +183,7 @@ async function handler(req, res) {
     const target = decode(token);
     const upstream = await fetchPublic(target);
     if (upstream.type === 'text/html' || upstream.type === 'application/xhtml+xml') {
-      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
+      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'self'; base-uri 'none'");
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(upstream.status).send(req.method === 'HEAD' ? '' : rewriteHtml(upstream.body, upstream.url));
     }
